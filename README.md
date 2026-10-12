@@ -1,6 +1,4 @@
 # UMKM Sight
-
-Isi:
 1. Use Case Diagram
 2. ERD
 3. Sequence Diagram (4 skenario)
