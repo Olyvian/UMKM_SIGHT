@@ -1,0 +1,28 @@
+@startuml Activity_Konfirmasi_Restock
+title Activity Diagram - Menerima Alert & Konfirmasi Restock
+skinparam shadowing false
+|Perangkat Pengguna|
+start
+:Menerima push notification restock;
+|Pemilik UMKM|
+:Mengetuk notifikasi;
+|Aplikasi Flutter|
+:Membuka Pusat Notifikasi;
+:Mengambil daftar alert dari backend;
+:Menampilkan detail alert & prediksi stok;
+|Pemilik UMKM|
+if (Melakukan restock?) then (ya)
+  :Mengisi jumlah barang masuk & supplier;
+  |Backend Laravel|
+  :Mencatat transaksi pembelian (PURCHASE);
+  :Menambah stok produk;
+  :Mencatat mutasi stok (IN);
+  :Menandai notifikasi sudah dibaca;
+  |Aplikasi Flutter|
+  :Memperbarui dasbor & cache inventaris;
+else (tidak)
+  |Aplikasi Flutter|
+  :Alert tetap tersimpan di riwayat;
+endif
+stop
+@enduml

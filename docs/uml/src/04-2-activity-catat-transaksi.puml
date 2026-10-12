@@ -1,0 +1,34 @@
+@startuml Activity_Catat_Transaksi
+title Activity Diagram - Catat Transaksi Penjualan
+skinparam shadowing false
+|Pemilik UMKM|
+start
+:Membuka layar Produk & Transaksi;
+:Memilih produk dan mengisi jumlah;
+:Menekan tombol Simpan Transaksi;
+|Aplikasi Flutter|
+:Memvalidasi input form;
+if (Input valid?) then (ya)
+  :Mengirim POST /api/transactions;
+  |Backend Laravel|
+  :Memulai database transaction;
+  :Memeriksa stok setiap produk;
+  if (Stok mencukupi?) then (ya)
+    :Menyimpan transaksi & item transaksi;
+    :Mengurangi stok produk;
+    :Mencatat mutasi stok (OUT);
+    :Commit database transaction;
+    |Aplikasi Flutter|
+    :Memperbarui cache inventaris (sqflite);
+    :Menampilkan konfirmasi transaksi berhasil;
+  else (tidak)
+    |Backend Laravel|
+    :Rollback database transaction;
+    |Aplikasi Flutter|
+    :Menampilkan pesan stok tidak mencukupi;
+  endif
+else (tidak)
+  :Menampilkan pesan kesalahan input;
+endif
+stop
+@enduml

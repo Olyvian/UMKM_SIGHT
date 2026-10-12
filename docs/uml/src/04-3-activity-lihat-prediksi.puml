@@ -1,0 +1,37 @@
+@startuml Activity_Lihat_Prediksi
+title Activity Diagram - Lihat Prediksi Kebutuhan Stok
+skinparam shadowing false
+|Pemilik UMKM|
+start
+:Membuka layar Analitik Prediksi;
+:Memilih produk & horizon 7 - 30 hari;
+|Aplikasi Flutter|
+:Mengirim GET /api/products/{id}/forecast;
+|Backend Laravel|
+:Mencari forecast terbaru di PostgreSQL;
+if (Forecast masih valid?) then (ya)
+else (tidak)
+  :Mengambil riwayat penjualan harian produk;
+  :Mengirim permintaan prediksi ke layanan ML;
+  |Layanan ML (FastAPI)|
+  :Praproses data deret waktu;
+  :Menjalankan inferensi model;
+  if (Berhasil dalam batas waktu 5 detik?) then (ya)
+    :Mengembalikan prediksi & metrik (MAPE, RMSE, MAE);
+    |Backend Laravel|
+    :Menyimpan forecasts & forecast_details;
+  else (tidak)
+    |Backend Laravel|
+    :Mengembalikan error 503;
+  endif
+endif
+|Aplikasi Flutter|
+if (Data prediksi tersedia?) then (ya)
+  :Menampilkan grafik tren & grafik proyeksi stok;
+else (tidak)
+  :Menampilkan pesan error & data cache terakhir;
+endif
+|Pemilik UMKM|
+:Meninjau hasil prediksi;
+stop
+@enduml

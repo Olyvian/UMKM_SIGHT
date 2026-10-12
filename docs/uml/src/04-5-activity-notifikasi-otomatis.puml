@@ -1,0 +1,32 @@
+@startuml Activity_Peramalan_Notifikasi_Otomatis
+title Activity Diagram - Peramalan & Automated Push Notification
+skinparam shadowing false
+|Penjadwal Laravel|
+start
+:Pemicu terjadwal berjalan;
+|Backend Laravel|
+:Mengambil daftar produk aktif;
+while (Masih ada produk\nyang belum dicek?) is (ya)
+  :Mengambil riwayat penjualan produk\ndari PostgreSQL;
+  |Layanan ML (FastAPI)|
+  :Praproses: agregasi harian / mingguan,\nbersihkan missing value & retur;
+  :Inferensi model time series\n(ARIMA / SARIMA / Prophet);
+  :Mengembalikan prediksi permintaan\n& metrik evaluasi;
+  |Backend Laravel|
+  :Menyimpan forecasts & forecast_details;
+  :Menghitung estimasi hari stok habis;
+  if (Estimasi habis <= ambang batas?) then (ya)
+    :Membuat record notifikasi RESTOCK_ALERT;
+    :Mengambil FCM token milik pengguna;
+    |FCM|
+    :Meneruskan push notification\nke perangkat;
+    |Perangkat Pengguna|
+    :Menampilkan notifikasi\n"Stok Barang X diprediksi habis dalam N hari";
+    |Backend Laravel|
+  else (tidak)
+  endif
+endwhile (tidak)
+|Penjadwal Laravel|
+:Mencatat log eksekusi job;
+stop
+@enduml

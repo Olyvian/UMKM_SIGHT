@@ -1,0 +1,98 @@
+@startuml UseCase_UMKM_Sight
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+title Use Case Diagram - UMKM Sight
+
+actor "Pemilik UMKM" as Owner
+actor "Admin" as Admin
+actor "Layanan ML\n(Python / FastAPI)" as ML <<sistem>>
+actor "Firebase Cloud\nMessaging (FCM)" as FCM <<sistem>>
+actor "Penjadwal\n(Laravel Scheduler)" as Sched <<sistem>>
+
+rectangle "Sistem UMKM Sight" {
+  usecase "Registrasi Akun" as UC01
+  usecase "Login" as UC02
+  usecase "Logout" as UC03
+  usecase "Kelola Profil Toko" as UC04
+
+  usecase "Kelola Produk" as UC05
+  usecase "Kelola Kategori Produk" as UC06
+  usecase "Kelola Supplier" as UC07
+  usecase "Catat Transaksi Penjualan" as UC08
+  usecase "Catat Pembelian Barang" as UC09
+  usecase "Perbarui Stok" as UC10
+  usecase "Lihat Dasbor Stok" as UC11
+  usecase "Lihat Riwayat Mutasi Stok" as UC12
+
+  usecase "Lihat Prediksi Kebutuhan Stok" as UC13
+  usecase "Lihat Grafik Tren Penjualan" as UC14
+  usecase "Hasilkan Peramalan" as UC15
+
+  usecase "Cek Ambang Batas Stok" as UC16
+  usecase "Kirim & Terima Push Notification\nRestock" as UC17
+  usecase "Lihat Pusat Notifikasi\n& Riwayat Alert" as UC18
+  usecase "Konfirmasi Restock" as UC19
+
+  usecase "Kelola Akun Pengguna" as UC20
+  usecase "Pantau Performa Model" as UC21
+  usecase "Latih Ulang Model" as UC22
+  usecase "Lihat Log Notifikasi" as UC23
+}
+
+' --- Asosiasi Pemilik UMKM ---
+Owner --> UC01
+Owner --> UC02
+Owner --> UC03
+Owner --> UC04
+Owner --> UC05
+Owner --> UC06
+Owner --> UC07
+Owner --> UC08
+Owner --> UC09
+Owner --> UC11
+Owner --> UC12
+Owner --> UC13
+Owner --> UC14
+Owner --> UC17
+Owner --> UC18
+Owner --> UC19
+
+' --- Asosiasi Admin ---
+Admin --> UC02
+Admin --> UC03
+Admin --> UC20
+Admin --> UC21
+Admin --> UC22
+Admin --> UC23
+
+' --- Asosiasi aktor sistem ---
+UC15 -- ML
+UC22 -- ML
+UC16 -- Sched
+UC17 -- FCM
+
+' --- Relasi include ---
+UC08 .> UC10 : <<include>>
+UC09 .> UC10 : <<include>>
+UC19 .> UC09 : <<include>>
+UC13 .> UC15 : <<include>>
+UC16 .> UC15 : <<include>>
+
+' --- Relasi extend (panah dari use case ekstensi ke use case dasar) ---
+UC17 .> UC16 : <<extend>>
+UC19 .> UC18 : <<extend>>
+UC14 .> UC13 : <<extend>>
+UC22 .> UC21 : <<extend>>
+
+note bottom of UC17
+  extension point: stok diprediksi habis
+  <= ambang batas restock
+end note
+
+note "Seluruh use case selain Registrasi dan Login\nmensyaratkan pengguna sudah login." as N1
+@enduml

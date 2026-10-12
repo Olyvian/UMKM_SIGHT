@@ -1,0 +1,32 @@
+@startuml Activity_Pipeline_ML
+title Activity Diagram - Pipeline Machine Learning Time Series Forecasting
+skinparam shadowing false
+|ML Engineer|
+start
+:Mengunduh dataset UCI Online Retail\n+ data transaksi UMKM;
+:Praproses: agregasi harian / mingguan,\nbersihkan missing value & transaksi retur;
+:Membagi data (time series split 80% latih / 20% uji);
+|Layanan ML|
+fork
+  :Melatih model baseline\n(Moving Average / ARIMA / SARIMA);
+fork again
+  :Melatih model lanjutan\n(Prophet / LSTM-GRU);
+end fork
+:Mengevaluasi model\n(MAPE, RMSE, MAE) pada data uji;
+|ML Engineer|
+while (MAPE > 20%?) is (ya)
+  :Optimasi hyperparameter\n& rekayasa fitur;
+  |Layanan ML|
+  :Melatih ulang & mengevaluasi\n(MAPE, RMSE, MAE);
+  |ML Engineer|
+endwhile (tidak)
+:Memilih model terbaik;
+|Layanan ML|
+:Mengemas model sebagai\nmicroservice REST API (FastAPI);
+:Mendeploy layanan inferensi;
+|Backend Laravel|
+:Mengintegrasikan endpoint prediksi\nke backend Laravel;
+|Aplikasi Flutter|
+:Menampilkan hasil prediksi\ndi dasbor mobile;
+stop
+@enduml

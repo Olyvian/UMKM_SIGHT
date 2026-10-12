@@ -1,0 +1,34 @@
+@startuml Activity_Login
+title Activity Diagram - Login
+skinparam shadowing false
+|Pemilik UMKM|
+start
+:Membuka aplikasi UMKM Sight;
+|Aplikasi Flutter|
+:Memeriksa token sesi di shared_preferences;
+if (Token sesi masih valid?) then (ya)
+  :Membuka Beranda & Dasbor Stok;
+else (tidak)
+  |Pemilik UMKM|
+  :Mengisi email & password;
+  |Backend Laravel|
+  :Memvalidasi kredensial di PostgreSQL;
+  while (Kredensial valid?) is (tidak)
+    |Aplikasi Flutter|
+    :Menampilkan pesan error login;
+    |Pemilik UMKM|
+    :Mengisi ulang email & password;
+    |Backend Laravel|
+    :Memvalidasi kredensial di PostgreSQL;
+  endwhile (ya)
+  :Menerbitkan token autentikasi;
+  |Aplikasi Flutter|
+  :Menyimpan token di shared_preferences;
+  :Mengirim FCM token perangkat ke backend;
+  |Backend Laravel|
+  :Menyimpan / memperbarui device token;
+  |Aplikasi Flutter|
+  :Menampilkan Beranda & Dasbor Stok;
+endif
+stop
+@enduml
