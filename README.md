@@ -5,7 +5,6 @@
 4. Activity Diagram (2 alur)
 5. Class Diagram
 
-> Catatan: Mermaid tidak punya tipe "use case" dan "activity" bawaan, jadi keduanya dibuat dengan `flowchart` yang dibentuk menyerupai notasi UML.
 
 ---
 
@@ -653,7 +652,7 @@ classDiagram
 
 ---
 
-## Asumsi yang dipakai (silakan koreksi)
+## Asumsi yang dipakai
 
 1. Aktor utama hanya **Pemilik UMKM**; tidak ada admin (proposal tidak menyebut peran admin).
 2. Satu akun = satu toko → relasi `USERS 1:1 STORES`.
