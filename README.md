@@ -1,7 +1,4 @@
-# UMKM Sight — Diagram Mermaid
-
-Berdasarkan *Proposal Produk PBL Sem 5 – UMKM Sight*.
-Cara pakai: salin isi tiap blok ```mermaid ke https://mermaid.live (atau ke Markdown di GitHub / Notion / VS Code) untuk dirender, lalu ekspor ke PNG/SVG.
+# UMKM Sight
 
 Isi:
 1. Use Case Diagram
