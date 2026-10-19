@@ -1,0 +1,32 @@
+﻿# Secrets and local environment
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Laravel
+backend/vendor/
+backend/.phpunit.cache/
+
+# Python
+ml-service/.venv/
+ml-service/venv/
+ml-service/__pycache__/
+ml-service/.pytest_cache/
+*.py[cod]
+
+# Generated datasets and artifacts
+ml-service/data/raw/
+ml-service/artifacts/
+
+# OS files
+.DS_Store
+Thumbs.db
