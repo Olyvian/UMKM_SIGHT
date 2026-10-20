@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import 'product_screens.dart';
 
 // Warna tambahan khusus halaman ini (tidak ada di AppColors)
 const _kRestock = Color(0xFF9A3412);
@@ -104,7 +105,16 @@ class _HomeScreensState extends State<HomeScreens> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
+            onTap: (i) {
+      if (i == 1) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ProductScreens()),
+        );
+      } else {
+        setState(() => _tab = i);
+      }
+    },
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.surface,
         selectedItemColor: AppColors.primary,
