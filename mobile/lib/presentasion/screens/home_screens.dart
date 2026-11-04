@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import 'product_screens.dart';
+import '../widgets/app_shell.dart';
+import '../widgets/stock_in_sheet.dart';
+import 'analytics_screens.dart';
+
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRestock = Color(0xFF9A3412);
@@ -109,19 +112,6 @@ class HomeScreens extends StatefulWidget {
 }
 
 class _HomeScreensState extends State<HomeScreens> {
-  int _tab = 0;
-
-  void _onNavTap(int i) {
-    if (i == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ProductScreens()),
-      );
-    } else {
-      setState(() => _tab = i);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,49 +161,7 @@ class _HomeScreensState extends State<HomeScreens> {
           ],
         ),
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 16,
-              offset: Offset(0, -4),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _tab,
-          onTap: _onNavTap,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          backgroundColor: AppColors.surface,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textMuted,
-          selectedFontSize: 13,
-          unselectedFontSize: 13,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home_rounded),
-              label: 'Beranda',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              label: 'Produk',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long_outlined),
-              label: 'Transaksi',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.show_chart),
-              label: 'Analitik',
-            ),
-          ],
-        ),
-      ),
+      bottomNavigationBar: const AppBottomNav(current: 0),
     );
   }
 }
@@ -377,7 +325,10 @@ class _Greeting extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () {},
+            onTap: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AnalyticsScreens()),
+              ),
             child: const SizedBox(
               width: 52,
               height: 52,
@@ -496,7 +447,17 @@ class _ActionButtons extends StatelessWidget {
         const SizedBox(width: 14),
         Expanded(
           child: FilledButton.icon(
-            onPressed: () {},
+            onPressed: () => showStockInSheet(
+              context,
+              products: const [
+                StockInProduct(
+                    name: 'Minyak Goreng Sania 2L', unit: 'botol', suggested: 24),
+                StockInProduct(
+                    name: 'Beras Premium 5 kg', unit: 'karung', suggested: 15),
+                StockInProduct(
+                    name: 'Gula Pasir 1 kg', unit: 'kg', suggested: 25),
+              ],
+            ),
             icon: const Icon(Icons.add_box_outlined, size: 24),
             label: const FittedBox(child: Text('+ Stok Masuk')),
             style: FilledButton.styleFrom(

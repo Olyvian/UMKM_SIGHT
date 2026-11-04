@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
-import 'home_screens.dart';
+import '../widgets/app_shell.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRestock = Color(0xFF9A3412);
@@ -102,15 +102,6 @@ class _ProductScreensState extends State<ProductScreens> {
     }
   }
 
-  void _onNavTap(int i) {
-    if (i == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreens()),
-      );
-    }
-  }
-
   @override
   void dispose() {
     _searchCtrl.dispose();
@@ -174,49 +165,7 @@ class _ProductScreensState extends State<ProductScreens> {
           ],
         ),
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 16,
-              offset: Offset(0, -4),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: 1,
-          onTap: _onNavTap,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          backgroundColor: AppColors.surface,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textMuted,
-          selectedFontSize: 13,
-          unselectedFontSize: 13,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              label: 'Beranda',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              activeIcon: Icon(Icons.inventory_2_rounded),
-              label: 'Produk',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long_outlined),
-              label: 'Transaksi',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.show_chart),
-              label: 'Analitik',
-            ),
-          ],
-        ),
-      ),
+            bottomNavigationBar: const AppBottomNav(current: 1),
     );
   }
 }
