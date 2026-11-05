@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../screens/analytics_screens.dart';
 import '../screens/home_screens.dart';
 import '../screens/product_screens.dart';
-
+import '../screens/transaction_screens.dart';
 // =====================================================================
 // Widget bersama untuk semua halaman utama.
 // Simpan di: lib/presentasion/widgets/app_shell.dart
@@ -142,6 +142,7 @@ class AppBottomNav extends StatelessWidget {
     final Widget? page = switch (target) {
       0 => const HomeScreens(),
       1 => const ProductScreens(),
+      2 => const TransactionScreens(),
       3 => const AnalyticsScreens(),
       _ => null, // Transaksi belum dibuat
     };
@@ -201,10 +202,12 @@ class AppBottomNav extends StatelessWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long_rounded),
             label: 'Transaksi',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.show_chart),
+            activeIcon: Icon(Icons.show_chart),
             label: 'Analitik',
           ),
         ],
