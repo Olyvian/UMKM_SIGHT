@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../widgets/app_shell.dart';
+import 'product_detail_screens.dart';
+
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRestock = Color(0xFF9A3412);
@@ -155,7 +157,15 @@ class _ProductScreensState extends State<ProductScreens> {
                   for (final p in list)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: _ProductTile(product: p, onTap: () {}),
+                      child: _ProductTile(
+                        product: p,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProductDetailScreens(sku: p.sku),
+                          ),
+                        ),
+                      ),
                     ),
                   const SizedBox(height: 12),
                   const _SyncFooter(),

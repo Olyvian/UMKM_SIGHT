@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../widgets/app_shell.dart';
+import 'product_detail_screens.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kBrown = Color(0xFF9A3412);
@@ -978,14 +979,12 @@ class _RecommendationCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {
-                // TODO: buka halaman detail produk (kirim item.sku / id produk)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Halaman detail produk belum tersedia'),
-                  ),
-                );
-              },
+              onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductDetailScreens(sku: item.sku),
+              ),
+            ),
               icon: const Icon(Icons.arrow_forward_rounded, size: 22),
               label: const Text('Lihat Detail Produk'),
               iconAlignment: IconAlignment.end,
