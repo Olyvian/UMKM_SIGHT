@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
-import '../../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../../presentasion/screens/home_screens.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 
 abstract final class AppRoutes {
@@ -45,7 +45,7 @@ class AppRouter {
         ),
         GoRoute(
           path: AppRoutes.dashboard,
-          builder: (context, state) => const DashboardPage(),
+          builder: (context, state) => const HomeScreens(),
         ),
       ],
     );

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../widgets/app_shell.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRed = Color(0xFFB91C1C);
@@ -117,7 +119,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
     _toast('Kata sandi berhasil diubah');
   }
 
-  Future<void> _logout() async {
+    Future<void> _logout() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -142,8 +144,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
       ),
     );
     if (ok != true || !mounted) return;
-    // TODO: hapus token sesi lalu arahkan ke halaman login
-    _toast('Berhasil keluar (demo)');
+    context.read<AuthBloc>().add(const AuthLogoutRequested());
   }
 
   @override
