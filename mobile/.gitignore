@@ -1,26 +1,26 @@
-# Flutter and Dart
+# Flutter / Dart
 .dart_tool/
 .packages
-.pub/
 .pub-cache/
+.pub/
+build/
+pubspec.lock
 .flutter-plugins
 .flutter-plugins-dependencies
-build/
-coverage/
 
 # IDE
 .idea/
+.vscode/
 *.iml
-*.ipr
-*.iws
 
-# Android local files
-android/local.properties
-android/key.properties
-android/app/debug/
-android/app/profile/
-android/app/release/
+# Platform generated
+**/Pods/
+**/.gradle/
+local.properties
+*.jks
+key.properties
+google-services.json
+GoogleService-Info.plist
 
-# OS files
+# OS
 .DS_Store
-Thumbs.db
