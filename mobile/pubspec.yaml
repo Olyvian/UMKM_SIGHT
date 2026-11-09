@@ -1,0 +1,33 @@
+name: umkm_sight
+description: Sistem prediksi & analisis stok UMKM berbasis mobile (Time Series Forecasting & Automated Push Notification).
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigasi
+  go_router: ^14.6.0
+
+  # State management (BLoC)
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.7
+
+  # Jaringan & penyimpanan lokal
+  dio: ^5.7.0
+  shared_preferences: ^2.3.2
+
+  # UI
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
