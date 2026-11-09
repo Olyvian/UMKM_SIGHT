@@ -22,4 +22,12 @@ abstract final class AppColors {
 
   /// Bayangan sangat tipis di bawah kolom input.
   static const softShadow = Color(0x0F0F172A);
+
+  // ---- Alias untuk layar lama (home, produk, transaksi, analytics, profil) ----
+  static const chip = chipFill;
+  static const hint = textHint;
+  static const textDark = textPrimary;
+  static const textMuted = textSecondary;
+  static const shadow = softShadow;
+  static const error = danger;
 }
