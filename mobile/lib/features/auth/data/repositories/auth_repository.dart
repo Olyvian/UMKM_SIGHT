@@ -54,7 +54,7 @@ class AuthRepository {
         ApiConstants.login,
         body: {'email': email, 'password': password},
       );
-      return _persist(response.data as Map<String, dynamic>);
+      return await _persist(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw AuthException(
         _messageFrom(e, fallback: 'Email atau kata sandi salah.'),
@@ -83,7 +83,7 @@ class AuthRepository {
           'password_confirmation': password,
         },
       );
-      return _persist(response.data as Map<String, dynamic>);
+      return await _persist(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw AuthException(
         _messageFrom(e, fallback: 'Pendaftaran gagal. Coba lagi.'),
