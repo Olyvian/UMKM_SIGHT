@@ -4,7 +4,9 @@ import '../../core/theme/app_colors.dart';
 import '../screens/analytics_screens.dart';
 import '../screens/home_screens.dart';
 import '../screens/product_screens.dart';
+import '../screens/profile_screens.dart';
 import '../screens/transaction_screens.dart';
+
 // =====================================================================
 // Widget bersama untuk semua halaman utama.
 // Simpan di: lib/presentasion/widgets/app_shell.dart
@@ -119,10 +121,16 @@ class AppTopBar extends StatelessWidget {
             size: 28,
           ),
           const SizedBox(width: 18),
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary,
-            child: Icon(Icons.person_outline_rounded, color: Colors.white),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreens()),
+            ),
+            child: const CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.primary,
+              child: Icon(Icons.person_outline_rounded, color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -144,7 +152,7 @@ class AppBottomNav extends StatelessWidget {
       1 => const ProductScreens(),
       2 => const TransactionScreens(),
       3 => const AnalyticsScreens(),
-      _ => null, // Transaksi belum dibuat
+      _ => null, // tab lain belum tersedia
     };
 
     if (page == null) {
@@ -207,7 +215,6 @@ class AppBottomNav extends StatelessWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.show_chart),
-            activeIcon: Icon(Icons.show_chart),
             label: 'Analitik',
           ),
         ],

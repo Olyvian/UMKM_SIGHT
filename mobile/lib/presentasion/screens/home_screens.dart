@@ -120,7 +120,7 @@ class _HomeScreensState extends State<HomeScreens> {
         bottom: false,
         child: Column(
           children: [
-            const _TopBar(),
+            const AppTopBar(),
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),

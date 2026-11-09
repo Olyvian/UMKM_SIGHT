@@ -127,7 +127,7 @@ class _ProductScreensState extends State<ProductScreens> {
         bottom: false,
         child: Column(
           children: [
-            const _TopBar(),
+            const AppTopBar(),
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
