@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/sale_entry_sheet.dart';
 import '../widgets/stock_in_sheet.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
@@ -82,6 +83,18 @@ const _stockInProducts = <StockInProduct>[
   StockInProduct(name: 'Mi Instan Goreng', unit: 'bungkus'),
 ];
 
+const _saleProducts = <SaleEntryProduct>[
+  SaleEntryProduct(
+      name: 'Minyak Goreng Sania 2L', unit: 'botol', availableStock: 0),
+  SaleEntryProduct(
+      name: 'Beras Premium 5 kg', unit: 'karung', availableStock: 4),
+  SaleEntryProduct(name: 'Gula Pasir 1 kg', unit: 'kg', availableStock: 9),
+  SaleEntryProduct(
+      name: 'Kecap Manis Botol 600 ml', unit: 'botol', availableStock: 24),
+  SaleEntryProduct(
+      name: 'Mi Instan Goreng', unit: 'bungkus', availableStock: 38),
+];
+
 // =====================================================================
 class TransactionScreens extends StatefulWidget {
   const TransactionScreens({super.key});
@@ -97,6 +110,15 @@ class _TransactionScreensState extends State<TransactionScreens> {
 
   void _soon(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openSaleEntry() async {
+    final result = await showSaleEntrySheet(context, products: _saleProducts);
+    if (result == null || !mounted) return;
+    _soon(
+      '${result.quantity} ${result.product.unit} ${result.product.name} '
+      'valid, tetapi belum disimpan ke riwayat.',
+    );
   }
 
   @override
@@ -145,7 +167,7 @@ class _TransactionScreensState extends State<TransactionScreens> {
                   ),
                   const SizedBox(height: 18),
                   _ActionRow(
-                    onSale: () => _soon('Form catat penjualan belum tersedia'),
+                    onSale: _openSaleEntry,
                     onStockIn: () => showStockInSheet(
                       context,
                       products: _stockInProducts,
