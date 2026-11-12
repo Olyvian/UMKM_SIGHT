@@ -11,16 +11,17 @@ class UserModel extends Equatable {
     this.store,
   });
 
-  final int id;
+  /// UUID pengguna (sama dengan auth.users.id di Supabase).
+  final String id;
   final String name;
   final String email;
 
-  /// "OWNER" atau "ADMIN" (lihat tabel USERS pada ERD).
+  /// "OWNER" atau "ADMIN" (lihat tabel profiles pada supabase/schema.sql).
   final String role;
   final StoreModel? store;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: (json['id'] as num).toInt(),
+        id: json['id'].toString(),
         name: json['name'] as String,
         email: json['email'] as String,
         role: (json['role'] as String?) ?? 'OWNER',

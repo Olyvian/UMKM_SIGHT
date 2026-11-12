@@ -24,3 +24,6 @@ GoogleService-Info.plist
 
 # OS
 .DS_Store
+
+# Konfigurasi lokal (berisi URL & key Supabase)
+env.json
