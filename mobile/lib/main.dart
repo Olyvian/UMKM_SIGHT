@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import 'package:flutter/material.dart';
 import 'presentasion/screens/home_screens.dart';
 
@@ -15,8 +14,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-=======
-import 'app_startup.dart';
-
-Future<void> main() => startApp();
->>>>>>> Stashed changes
