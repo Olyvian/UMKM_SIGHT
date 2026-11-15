@@ -18,12 +18,31 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
-PROCESSED_DIR = DATA_DIR / "processed"
 ARTIFACT_DIR = PROJECT_ROOT / "artifacts"
 
-RAW_SALES_CSV = RAW_DIR / "sales_sample.csv"
 TEMPLATE_DIR = DATA_DIR / "templates"
 TEMPLATE_XLSX = TEMPLATE_DIR / "template_transaksi.xlsx"
+
+# ---------------------------------------------------------------------------
+# Dataset default (dipakai bila `--data` tidak diisi)
+# ---------------------------------------------------------------------------
+# File penjualan: satu baris = satu baris transaksi ritel.
+# Kolom yang dipakai: Transaction Date, Product No, Product Description,
+# Qty Sold, Is Return.
+DEFAULT_SALES_CSV = RAW_DIR / "retail_sales_ml_apl.csv"
+
+# File snapshot stok. Berisi riwayat status stok per produk per toko; yang
+# relevan hanya baris yang MASIH BERLAKU (End Date = INVENTORY_OPEN_END_DATE).
+DEFAULT_INVENTORY_CSV = RAW_DIR / "retail_inventory_ml_apl.csv"
+
+# Nilai End Date yang menandai "stok berlaku sampai waktu tak terbatas".
+# Baris dengan tanggal ini = stok TERKINI. Tanggal lain = riwayat masa lalu.
+# Jangan diganti dengan tanggal hari ini: nilai ini sengaja dipakai sebagai
+# penanda baris terbuka oleh sistem sumber data.
+INVENTORY_OPEN_END_DATE = "9999-12-31"
+
+# Data simulasi. Hanya dipakai bila diminta eksplisit lewat `--regenerate`.
+SYNTHETIC_SALES_CSV = RAW_DIR / "sales_sample.csv"
 
 # ---------------------------------------------------------------------------
 # Aturan data
@@ -49,10 +68,6 @@ HORIZON_DAYS = 7
 # minggu yang kebetulan ramai/sepi.
 EVAL_HORIZON_DAYS = 28
 
-# Proporsi data uji. Dipertahankan untuk kompatibilitas, tetapi TIDAK lagi
-# dipakai sebagai default: lihat EVAL_HORIZON_DAYS di atas.
-TEST_FRACTION = 0.2
-
 # Minimal panjang data uji agar metrik tidak "kebetulan bagus".
 MIN_TEST_DAYS = 7
 
@@ -76,5 +91,5 @@ DEFAULT_LEAD_TIME_DAYS = 3
 
 def ensure_directories() -> None:
     """Buat folder yang dibutuhkan agar pipeline bisa langsung dijalankan."""
-    for directory in (RAW_DIR, PROCESSED_DIR, ARTIFACT_DIR, TEMPLATE_DIR):
+    for directory in (RAW_DIR, ARTIFACT_DIR, TEMPLATE_DIR):
         directory.mkdir(parents=True, exist_ok=True)

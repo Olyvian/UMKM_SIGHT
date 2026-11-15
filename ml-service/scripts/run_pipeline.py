@@ -70,7 +70,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--data",
         type=Path,
         default=None,
-        help="File .xlsx/.xls/.csv milik sendiri. Kosongkan untuk data simulasi.",
+        help=(
+            "File .xlsx/.xls/.csv milik sendiri. Kosongkan untuk dataset "
+            f"default ({config.DEFAULT_SALES_CSV.name})."
+        ),
     )
     parser.add_argument("--horizon", type=int, default=config.HORIZON_DAYS)
     parser.add_argument(
@@ -120,7 +123,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--regenerate",
         action="store_true",
-        help="Buat ulang data simulasi (hanya bila --data tidak dipakai).",
+        help=(
+            "Pakai data SIMULASI (sales_sample.csv) alih-alih dataset default. "
+            "Berguna untuk uji cepat tanpa data asli."
+        ),
     )
     parser.add_argument(
         "--inspect",
@@ -154,11 +160,12 @@ def main() -> int:
 
     # --- Mode inspeksi: cek file dulu sebelum percaya hasilnya --------------
     if args.inspect:
-        if args.data is None:
-            print("Mode --inspect membutuhkan --data <file>.")
+        inspect_path = args.data if args.data is not None else config.DEFAULT_SALES_CSV
+        if not Path(inspect_path).exists():
+            print(f"File tidak ditemukan: {inspect_path}")
             return 2
         try:
-            frame = load_user_data(args.data, sheet=args.sheet)
+            frame = load_user_data(inspect_path, sheet=args.sheet)
         except DataImportError as exc:
             print("GAGAL MEMBACA DATA:")
             print(exc)
@@ -166,7 +173,7 @@ def main() -> int:
         print("=" * 78)
         print("ISI FILE DATA")
         print("=" * 78)
-        print(f"File   : {args.data}")
+        print(f"File   : {inspect_path}")
         print(f"Sheet  : {frame.attrs.get('sheet', '-')}")
         print(f"Baris  : {len(frame)}")
         print(f"Produk : {frame['product_id'].nunique()} produk berbeda")
@@ -226,6 +233,12 @@ def main() -> int:
     print("=" * 78)
     print(f"Sumber data : {summary['data_source']}")
     print(f"File        : {summary['data_file']}")
+    if summary.get("inventory_file"):
+        print(
+            f"File stok   : {summary['inventory_file']} "
+            f"({summary['inventory_products']} produk, "
+            f"End Date {summary['inventory_open_end_date']})"
+        )
     print(
         f"Produk      : {summary['products_processed']} dari "
         f"{summary['total_products_in_file']} produk di file"

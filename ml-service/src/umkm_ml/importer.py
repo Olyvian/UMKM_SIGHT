@@ -26,6 +26,7 @@ import pandas as pd
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "transaction_date": (
         "transaction_date",
+        "transaction date",
         "tanggal",
         "tgl",
         "date",
@@ -38,6 +39,8 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "quantity": (
         "quantity",
+        "qty sold",
+        "qty_sold",
         "qty",
         "jumlah",
         "jumlah terjual",
@@ -55,6 +58,8 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "product_id": (
         "product_id",
+        "product no",
+        "product_no",
         "produk_id",
         "id produk",
         "id_produk",
@@ -68,6 +73,8 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "product_name": (
         "product_name",
+        "product description",
+        "product_description",
         "nama produk",
         "nama_produk",
         "nama",
@@ -103,12 +110,25 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
 OPTIONAL_ALIASES: dict[str, tuple[str, ...]] = {
     "stock_on_hand": (
         "stock_on_hand",
+        "qty on hand",
+        "qty_on_hand",
+        "quantity on hand",
         "stok",
         "stok_tersedia",
         "sisa_stok",
         "persediaan",
         "stock",
         "inventory",
+    ),
+    # Penanda baris retur/pembatalan. Bila kolom ini ada, baris dengan nilai
+    # benar (1/True) dibuang sebelum agregasi harian — sama seperti baris
+    # berkuantitas negatif.
+    "is_return": (
+        "is_return",
+        "is return",
+        "adalah_retur",
+        "return_flag",
+        "flag_retur",
     ),
     "reorder_level": (
         "reorder_level",
@@ -402,6 +422,109 @@ def load_user_data(
         f"Sheet yang dicoba: {', '.join(map(str, candidates))}\n"
         f"Alasan per sheet:\n{detail}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Snapshot stok (file terpisah dari file penjualan)
+# ---------------------------------------------------------------------------
+# File inventori menyimpan riwayat status stok per produk per toko. Satu
+# produk bisa muncul puluhan kali (satu baris per toko) dan beberapa kali
+# untuk periode berbeda. Yang dipakai sebagai "stok sekarang" hanyalah baris
+# yang masih terbuka: End Date == INVENTORY_OPEN_END_DATE ("9999-12-31").
+INVENTORY_ALIASES: dict[str, tuple[str, ...]] = {
+    "product_id": (
+        "product no",
+        "product_no",
+        "product id",
+        "product_id",
+        "sku",
+        "kode produk",
+    ),
+    "stock": (
+        "qty on hand",
+        "qty_on_hand",
+        "quantity on hand",
+        "stock_on_hand",
+        "stok",
+        "stock",
+    ),
+    "end_date": (
+        "end date",
+        "end_date",
+        "tanggal akhir",
+        "tanggal_akhir",
+    ),
+}
+
+
+def load_inventory(
+    path: Path | str,
+    end_date: str = "9999-12-31",
+) -> dict[str, float]:
+    """Baca snapshot stok dan kembalikan {product_id: stok_terkini}.
+
+    Aturan:
+    1. Hanya baris dengan `End Date == end_date` yang dipakai. Baris lain
+       adalah riwayat periode yang sudah berakhir.
+    2. Bila satu produk muncul di beberapa toko, stoknya DIJUMLAHKAN. Ini
+       konsisten dengan data penjualan yang juga dijumlahkan lintas toko
+       untuk produk yang sama.
+    3. Stok negatif dijadikan 0. Angka negatif di file sumber berarti
+       ketidakcocokan pencatatan, bukan stok minus yang nyata.
+
+    Returns
+    -------
+    dict[str, float] — kunci berupa ID produk dalam bentuk teks.
+    """
+    frame = read_table(path)
+    frame.columns = [_normalize_header(c) for c in frame.columns]
+    columns = list(frame.columns)
+
+    pid_col = _match_any(columns, INVENTORY_ALIASES["product_id"])
+    stock_col = _match_any(columns, INVENTORY_ALIASES["stock"])
+    end_col = _match_any(columns, INVENTORY_ALIASES["end_date"])
+
+    if pid_col is None:
+        raise DataImportError(
+            "Kolom produk tidak ditemukan di file inventori.\n"
+            f"Kolom yang terbaca: {', '.join(map(str, frame.columns))}\n"
+            "Beri nama kolom produk: 'Product No' / product_id / SKU."
+        )
+    if stock_col is None:
+        raise DataImportError(
+            "Kolom jumlah stok tidak ditemukan di file inventori.\n"
+            f"Kolom yang terbaca: {', '.join(map(str, frame.columns))}\n"
+            "Beri nama kolom stok: 'Qty on hand' / stock_on_hand / stok."
+        )
+    if end_col is None:
+        raise DataImportError(
+            "Kolom tanggal berakhir tidak ditemukan di file inventori.\n"
+            f"Kolom yang terbaca: {', '.join(map(str, frame.columns))}\n"
+            "Tanpa kolom ini, riwayat stok lama akan ikut dijumlahkan dan "
+            "hasilnya salah. Beri nama kolom: 'End Date' / end_date."
+        )
+
+    # --- 1. Ambil hanya baris yang masih berlaku ---------------------------
+    open_rows = frame[frame[end_col].astype(str).str.strip() == str(end_date)]
+    if open_rows.empty:
+        raise DataImportError(
+            f"Tidak ada baris dengan {end_col} == '{end_date}' di "
+            f"{Path(path).name}.\n"
+            "File ini mungkin hanya berisi riwayat stok lama. Periksa apakah "
+            "nilai penanda baris terbuka berbeda di sistem sumber."
+        )
+
+    # --- 2. Jumlahkan stok lintas toko per produk --------------------------
+    stock = pd.to_numeric(open_rows[stock_col], errors="coerce")
+    valid = stock.notna()
+    if not valid.any():
+        raise DataImportError(
+            f"Kolom '{stock_col}' tidak berisi angka yang bisa dibaca."
+        )
+
+    grouped = stock[valid].groupby(open_rows.loc[valid, pid_col].astype(str)).sum()
+    grouped = grouped.clip(lower=0)
+    return {pid: float(value) for pid, value in grouped.items()}
 
 
 def summarize(frame: pd.DataFrame, max_products: int = 20) -> str:
