@@ -18,7 +18,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
-PROCESSED_DIR = DATA_DIR / "processed"
 ARTIFACT_DIR = PROJECT_ROOT / "artifacts"
 
 TEMPLATE_DIR = DATA_DIR / "templates"
@@ -45,10 +44,6 @@ INVENTORY_OPEN_END_DATE = "9999-12-31"
 # Data simulasi. Hanya dipakai bila diminta eksplisit lewat `--regenerate`.
 SYNTHETIC_SALES_CSV = RAW_DIR / "sales_sample.csv"
 
-# Nama lama. Dipertahankan agar notebook/script lama tidak langsung rusak,
-# tetapi sekarang menunjuk ke data SIMULASI, bukan dataset default.
-RAW_SALES_CSV = SYNTHETIC_SALES_CSV
-
 # ---------------------------------------------------------------------------
 # Aturan data
 # ---------------------------------------------------------------------------
@@ -73,10 +68,6 @@ HORIZON_DAYS = 7
 # minggu yang kebetulan ramai/sepi.
 EVAL_HORIZON_DAYS = 28
 
-# Proporsi data uji. Dipertahankan untuk kompatibilitas, tetapi TIDAK lagi
-# dipakai sebagai default: lihat EVAL_HORIZON_DAYS di atas.
-TEST_FRACTION = 0.2
-
 # Minimal panjang data uji agar metrik tidak "kebetulan bagus".
 MIN_TEST_DAYS = 7
 
@@ -100,5 +91,5 @@ DEFAULT_LEAD_TIME_DAYS = 3
 
 def ensure_directories() -> None:
     """Buat folder yang dibutuhkan agar pipeline bisa langsung dijalankan."""
-    for directory in (RAW_DIR, PROCESSED_DIR, ARTIFACT_DIR, TEMPLATE_DIR):
+    for directory in (RAW_DIR, ARTIFACT_DIR, TEMPLATE_DIR):
         directory.mkdir(parents=True, exist_ok=True)
