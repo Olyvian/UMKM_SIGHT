@@ -22,11 +22,15 @@
 --     seperti sebelumnya (now()).
 --   * Aplikasi versi lama yang memanggil 2 parameter tetap berfungsi,
 --     karena p_transaction_date punya nilai default.
---   * PENTING: jalankan skrip ini SETELAH schema_Inventoris.sql. Bila
---     schema_Inventoris.sql dijalankan ulang (mis. untuk menyegarkan
---     skema), fungsi 2 parameter akan dibuat kembali dan PostgREST bisa
---     menolak panggilan karena ambigu. Dalam kasus itu, jalankan ulang
---     skrip ini.
+--   * KAPAN SKRIP INI DIPERLUKAN?
+--       - Database yang sudah menjalankan schema_Inventoris.sql versi LAMA
+--         (fungsi record_sale masih 2 parameter). Jalankan sekali saja.
+--       - Untuk instalasi baru TIDAK PERLU: schema_Inventoris.sql versi
+--         terbaru sudah memuat fungsi 3 parameter ini.
+--   * schema_Inventoris.sql versi terbaru sudah memuat
+--     "drop function if exists public.record_sale(jsonb, text);" sehingga
+--     menjalankannya ulang tidak lagi memunculkan overload. Skrip ini tetap
+--     disimpan untuk database yang sudah terlanjur memakai versi lama.
 --
 -- Cara pakai: Supabase > SQL Editor > New query > tempel seluruh isi file
 -- > Run.

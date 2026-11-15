@@ -30,6 +30,8 @@
 --   await supabase.rpc('record_sale', params: {
 --     'p_items': [{'product_id': id, 'quantity': 2}],
 --     'p_note': 'Pembeli A',
+--     // opsional: tanggal transaksi sebenarnya (default now())
+--     'p_transaction_date': '2026-04-15T02:30:00Z',
 --   });
 --   await supabase.rpc('record_stock_in',
 --     params: {'p_product_id': id, 'p_quantity': 15});
@@ -448,8 +450,22 @@ $$;
 
 -- Catat penjualan. p_items: [{"product_id": "...", "quantity": 2, "unit_price": 65000}]
 -- unit_price opsional (default = harga produk). Mengembalikan id transaksi.
--- Galat: EMPTY_ITEMS, INVALID_QUANTITY, PRODUCT_NOT_FOUND, INSUFFICIENT_STOCK.
-create or replace function public.record_sale(p_items jsonb, p_note text default null)
+-- p_transaction_date opsional: tanggal transaksi sebenarnya (mis. penjualan
+-- kemarin yang baru dicatat sekarang). Default now().
+-- Galat: EMPTY_ITEMS, INVALID_QUANTITY, PRODUCT_NOT_FOUND, INSUFFICIENT_STOCK,
+--        INVALID_DATE.
+
+-- Buang versi lama 2 parameter bila ada. Tanpa ini, PostgreSQL menyimpan
+-- keduanya sebagai overload dan PostgREST menolak memanggil karena ambigu
+-- ("Could not choose the best candidate function"). Lihat juga
+-- supabase/migration_record_sale_date.sql.
+drop function if exists public.record_sale(jsonb, text);
+
+create or replace function public.record_sale(
+p_items            jsonb,
+p_note             text default null,
+p_transaction_date timestamptz default null
+)
 returns uuid
 language plpgsql
 security definer
@@ -457,6 +473,7 @@ set search_path = ''
 as $$
 declare
 v_store   uuid := public.my_store_id();
+v_date    timestamptz := coalesce(p_transaction_date, now());
 v_tx      uuid;
 v_item    jsonb;
 v_prod    public.products;
@@ -471,8 +488,13 @@ if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_i
 raise exception 'EMPTY_ITEMS' using errcode = '22023';
 end if;
 
-insert into public.transactions (store_id, invoice_no, transaction_type, note)
-values (v_store, public.next_invoice_no(), 'SALE', p_note)
+-- Toleransi 5 menit untuk selisih jam perangkat dengan jam server.
+if v_date > now() + interval '5 minutes' then
+raise exception 'INVALID_DATE' using errcode = '22023';
+end if;
+
+insert into public.transactions (store_id, invoice_no, transaction_type, transaction_date, note)
+values (v_store, public.next_invoice_no(), 'SALE', v_date, p_note)
 returning id into v_tx;
 
 for v_item in select * from jsonb_array_elements(p_items) loop
@@ -501,10 +523,12 @@ update public.products set current_stock = current_stock - v_qty where id = v_pr
 insert into public.transaction_items (transaction_id, store_id, product_id, quantity, unit_price)
 values (v_tx, v_store, v_prod.id, v_qty, v_price);
 
+-- created_at diisi dengan tanggal transaksi agar riwayat mutasi stok
+-- (bagian "Aktivitas Terbaru" di beranda) urut konsisten.
 insert into public.stock_movements
-(store_id, product_id, transaction_id, movement_type, quantity, stock_before, stock_after, note)
+(store_id, product_id, transaction_id, movement_type, quantity, stock_before, stock_after, note, created_at)
 values
-(v_store, v_prod.id, v_tx, 'OUT', v_qty, v_prod.current_stock, v_prod.current_stock - v_qty, p_note);
+(v_store, v_prod.id, v_tx, 'OUT', v_qty, v_prod.current_stock, v_prod.current_stock - v_qty, p_note, v_date);
 
 v_total := v_total + v_qty * v_price;
 perform public._notify_stock(v_prod.id);
@@ -823,12 +847,12 @@ on public.stores to authenticated;
 revoke all on function public.my_store_id()                                         from public, anon;
 revoke all on function public.next_invoice_no()                                     from public, anon, authenticated;
 revoke all on function public._notify_stock(uuid)                                   from public, anon, authenticated;
-revoke all on function public.record_sale(jsonb, text)                              from public, anon;
+revoke all on function public.record_sale(jsonb, text, timestamptz)                 from public, anon;
 revoke all on function public.record_stock_in(uuid, integer, text, uuid, numeric)   from public, anon;
 revoke all on function public.adjust_stock(uuid, integer, text)                     from public, anon;
 
 grant execute on function public.my_store_id()                                      to authenticated;
-grant execute on function public.record_sale(jsonb, text)                           to authenticated;
+grant execute on function public.record_sale(jsonb, text, timestamptz)                to authenticated;
 grant execute on function public.record_stock_in(uuid, integer, text, uuid, numeric) to authenticated;
 grant execute on function public.adjust_stock(uuid, integer, text)                  to authenticated;
 
