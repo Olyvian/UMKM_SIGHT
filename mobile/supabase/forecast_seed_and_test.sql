@@ -124,15 +124,16 @@ begin
 
     if r.has_fc then
       insert into public.forecasts
-        (product_id, ml_model_id, horizon_days, generated_at)
+        (store_id, product_id, ml_model_id, horizon_days, generated_at)
       values
-        (v_prod, v_model, r.horizon, now() - make_interval(days => r.age_days))
+        (v_store, v_prod, v_model, r.horizon, now() - make_interval(days => r.age_days))
       returning id into v_fc;
 
       -- hari ke-1 = besok; prediksi konstan per hari
       insert into public.forecast_details
-        (forecast_id, forecast_date, predicted_qty, lower_bound, upper_bound)
+        (forecast_id, store_id, forecast_date, predicted_qty, lower_bound, upper_bound)
       select v_fc,
+             v_store,
              current_date + g,
              r.demand,
              round(r.demand * 0.8, 2),
