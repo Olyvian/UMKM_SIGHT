@@ -348,8 +348,8 @@ class ProductRepository {
     }
     if (const {'42P01', '42883', 'PGRST202', 'PGRST205'}.contains(error.code)) {
       return const ProductFailure(
-        'Skema inventaris belum tersedia. Jalankan schema.sql lalu '
-        'schema_Inventoris.sql di Supabase SQL Editor.',
+        'Skema inventaris belum tersedia. Jalankan schema.sql di Supabase '
+        'SQL Editor.',
       );
     }
     return ProductFailure('$fallback ${error.message}');

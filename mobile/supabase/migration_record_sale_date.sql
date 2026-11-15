@@ -3,7 +3,7 @@
 -- (Supabase / PostgreSQL)
 --
 -- MASALAH
---   schema_Inventoris.sql mendefinisikan
+--   Skema versi lama mendefinisikan
 --     public.record_sale(p_items jsonb, p_note text)
 --   sehingga penjualan SELALU dicatat pada waktu server (now()). Padahal
 --   formulir "Catat Penjualan" di aplikasi membiarkan pengguna memilih
@@ -23,11 +23,11 @@
 --   * Aplikasi versi lama yang memanggil 2 parameter tetap berfungsi,
 --     karena p_transaction_date punya nilai default.
 --   * KAPAN SKRIP INI DIPERLUKAN?
---       - Database yang sudah menjalankan schema_Inventoris.sql versi LAMA
+--       - Database yang sudah menjalankan schema.sql versi LAMA
 --         (fungsi record_sale masih 2 parameter). Jalankan sekali saja.
---       - Untuk instalasi baru TIDAK PERLU: schema_Inventoris.sql versi
---         terbaru sudah memuat fungsi 3 parameter ini.
---   * schema_Inventoris.sql versi terbaru sudah memuat
+--       - Untuk instalasi baru TIDAK PERLU: schema.sql versi terbaru
+--         sudah memuat fungsi 3 parameter ini.
+--   * schema.sql versi terbaru sudah memuat
 --     "drop function if exists public.record_sale(jsonb, text);" sehingga
 --     menjalankannya ulang tidak lagi memunculkan overload. Skrip ini tetap
 --     disimpan untuk database yang sudah terlanjur memakai versi lama.

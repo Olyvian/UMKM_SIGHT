@@ -78,26 +78,22 @@ Aplikasi ini memakai Supabase sebagai database (PostgreSQL) dan sistem login. Se
 
 1. Di menu kiri buka **SQL Editor**, lalu klik **New query**.
 2. Buka file [`supabase/schema.sql`](supabase/schema.sql) di project ini, salin **seluruh isinya**, tempel ke editor, lalu klik **Run**.
-3. Pastikan muncul **Success** tanpa error. Skrip ini membuat:
+3. Pastikan muncul **Success** tanpa error. Skrip ini membuat **seluruh** database aplikasi:
    - tabel `profiles` (data pengguna) dan `stores` (data toko),
    - trigger yang otomatis membuat profil dan toko saat ada pendaftaran,
-   - aturan Row Level Security (RLS): pengguna hanya bisa melihat dan mengubah datanya sendiri.
-4. Cek di **Table Editor**: tabel `profiles` dan `stores` harus sudah ada.
+   - tabel inventaris: `categories`, `suppliers`, `products`, `transactions`, `transaction_items`, `stock_movements`,
+   - tabel prediksi: `ml_models`, `forecasts`, `forecast_details`,
+   - tabel notifikasi: `notifications`, `device_tokens`,
+   - view `product_overview` dan `store_summary`, serta fungsi RPC (`record_sale`, `record_stock_in`, `adjust_stock`, `restock_alert_candidates`, dll.),
+   - aturan Row Level Security (RLS) dan hak akses tingkat kolom,
+   - bucket penyimpanan `product-images` untuk gambar produk.
+4. Cek di **Table Editor**: tabel-tabel di atas harus sudah ada.
 
-Skrip aman dijalankan ulang.
+Cukup satu file — tidak ada skrip lanjutan yang perlu dijalankan untuk instalasi baru.
 
-Untuk memakai halaman Produk dan skema inventaris, jalankan juga skrip berikut secara berurutan:
+Skrip aman dijalankan ulang dan bisa dipakai untuk project baru maupun project yang sudah memakai skema versi lama. Pada project lama, skrip ini menambahkan kolom yang kurang, mengisi `store_id` yang masih kosong, dan mencadangkan tabel lama ke schema `cadangan`. Uji pada project non-produksi terlebih dahulu, tinjau perubahan dengan pemilik project, dan jangan jalankan sendiri pada project bersama.
 
-1. [`supabase/forecast_schema.sql`](supabase/forecast_schema.sql), setelah `schema.sql`.
-2. [`supabase/schema_Inventoris.sql`](supabase/schema_Inventoris.sql), setelah kedua skrip sebelumnya.
-
-`schema_Inventoris.sql` memigrasikan skema produk/prediksi yang sudah ada dan membuat cadangan tabel lama. Uji pada project non-produksi terlebih dahulu, tinjau perubahan dengan pemilik project, dan jangan jalankan sendiri pada project bersama.
-
-3. [`supabase/migration_record_sale_date.sql`](supabase/migration_record_sale_date.sql) — **hanya untuk database yang sudah pernah menjalankan `schema_Inventoris.sql` versi lama.**
-
-`schema_Inventoris.sql` versi terbaru sudah memuat RPC `record_sale` dengan parameter `p_transaction_date` (tanggal transaksi sebenarnya, sehingga penjualan yang lupa dicatat bisa diisi dengan tanggal & jam lampau). Jadi untuk instalasi baru, langkah 3 dilewati. Skrip migrasi hanya diperlukan bila project-mu sudah terlanjur memakai versi lama: jalankan sekali, lalu cek dengan query verifikasi di dalam file tersebut. Tanpa itu, tombol **Catat Penjualan** tetap bisa dipakai, tetapi tanggal yang dipilih pengguna diabaikan server dan aplikasi menampilkan pesan agar skrip migrasi dijalankan.
-
-4. Untuk mengaktifkan halaman Produk, jalankan [`supabase/schema_Inventoris.sql`](supabase/schema_Inventoris.sql) di SQL Editor **setelah** `schema.sql`. Skrip ini menambahkan tabel produk, catatan perubahan stok, serta aturan aksesnya. Jangan jalankan skrip ini di project bersama sebelum perubahan skema disetujui tim.
+Khusus database yang masih memakai `record_sale` versi lama (belum punya parameter tanggal transaksi), jalankan sekali [`supabase/migration_record_sale_date.sql`](supabase/migration_record_sale_date.sql). Instalasi baru **tidak perlu** skrip itu karena `schema.sql` sudah memuat versi terbarunya. Tanpa itu, tombol **Catat Penjualan** tetap bisa dipakai, tetapi tanggal yang dipilih pengguna diabaikan server dan aplikasi menampilkan pesan agar skrip migrasi dijalankan.
 
 ### 1.3 Atur login email
 
@@ -200,10 +196,11 @@ Tanpa ini build **release** tidak bisa mengakses jaringan. Font Inter dimuat lew
 ## Struktur
 
 ```text
-supabase/schema.sql           # tabel, trigger, RLS (jalankan di SQL Editor)
-supabase/forecast_schema.sql   # tabel produk dan prediksi (setelah schema.sql)
-supabase/schema_Inventoris.sql # migrasi produk, transaksi, stok, dan RLS
-supabase/migration_record_sale_date.sql # tanggal transaksi pada RPC record_sale
+supabase/schema.sql           # SELURUH skema: profil, inventaris, prediksi, notifikasi, RLS
+supabase/migration_record_sale_date.sql # sekali pakai: tanggal transaksi pada RPC record_sale
+supabase/test_login.sql       # akun contoh untuk pengujian manual
+supabase/forecast_seed_and_test.sql # data uji + pengujian fungsi prediksi
+supabase/forecast_rls_test.sql # pengujian aturan akses tabel prediksi
 env.example.json              # contoh konfigurasi (salin menjadi env.json)
 lib/
 ├── main.dart                 # entry point

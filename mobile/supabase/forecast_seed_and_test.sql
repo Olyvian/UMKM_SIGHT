@@ -3,8 +3,7 @@
 --
 -- Prasyarat (berurutan):
 --   1. supabase/schema.sql
---   2. supabase/forecast_schema.sql
---   3. supabase/test_login.sql   (membuat akun budi@tokoberkah.com + tokonya)
+--   2. supabase/test_login.sql   (membuat akun budi@tokoberkah.com + tokonya)
 --
 -- CARA MENJALANKAN: SQL Editor hanya menampilkan hasil query TERAKHIR dalam
 -- satu eksekusi. Jalankan per BAGIAN dengan memblok teksnya lalu Run:

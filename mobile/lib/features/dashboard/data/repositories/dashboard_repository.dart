@@ -17,7 +17,7 @@ class DashboardFailure implements Exception {
 ///
 /// Semua query mengandalkan Row Level Security: data otomatis tersaring
 /// ke toko milik pengguna yang login (fungsi `my_store_id()` pada
-/// supabase/schema_Inventoris.sql), jadi tidak perlu filter `store_id`.
+/// supabase/schema.sql), jadi tidak perlu filter `store_id`.
 class DashboardRepository {
   DashboardRepository({required SupabaseClient client}) : _client = client;
 
@@ -78,8 +78,8 @@ class DashboardRepository {
     if (const {'42P01', '42883', 'PGRST202', 'PGRST205'}
         .contains(error.code)) {
       return const DashboardFailure(
-        'Skema beranda belum tersedia. Jalankan schema.sql lalu '
-        'schema_Inventoris.sql di Supabase SQL Editor.',
+        'Skema beranda belum tersedia. Jalankan schema.sql di Supabase '
+        'SQL Editor.',
       );
     }
     if (error.code == '42501') {
