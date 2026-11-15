@@ -38,6 +38,13 @@ class AuthRepository {
 
   sb.GoTrueClient get _auth => _client.auth;
 
+  /// Deep link yang dibuka dari tautan reset kata sandi di email.
+  static const passwordRecoveryRedirect = 'umkmsight://reset-password';
+
+  /// True bila perangkat ini sedang memegang sesi pemulihan kata sandi
+  /// (dibuat saat tautan reset dari email dibuka).
+  bool get hasRecoverySession => _auth.currentSession != null;
+
   static const _offlineMessage =
       'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
 
@@ -127,6 +134,37 @@ class AuthRepository {
       } catch (_) {}
     }
     await _storage.clear();
+  }
+
+  /// Mengirim tautan reset kata sandi ke [email].
+  ///
+  /// Supabase tidak memberi tahu apakah email terdaftar (mencegah orang
+  /// menebak akun), jadi pemanggil harus menampilkan pesan yang sama untuk
+  /// semua email.
+  Future<void> requestPasswordReset(String email) async {
+    try {
+      await _auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: passwordRecoveryRedirect,
+      );
+    } catch (e) {
+      throw _failure(e, fallback: 'Gagal mengirim tautan reset. Coba lagi.');
+    }
+  }
+
+  /// Menyimpan kata sandi baru memakai sesi pemulihan dari tautan email.
+  Future<void> updatePassword(String password) async {
+    try {
+      await _auth.updateUser(sb.UserAttributes(password: password));
+    } on sb.AuthSessionMissingException {
+      throw const AuthFailure(
+        'Tautan reset tidak valid atau sudah kedaluwarsa. '
+        'Minta tautan baru dari halaman Lupa kata sandi.',
+      );
+    } catch (e) {
+      throw _failure(e,
+          fallback: 'Gagal menyimpan kata sandi baru. Coba lagi.');
+    }
   }
 
   // ---------------------------------------------------------------------------

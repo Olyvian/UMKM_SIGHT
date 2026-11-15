@@ -373,10 +373,7 @@ class _SoftCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: child,
-          ),
+          child: Padding(padding: const EdgeInsets.all(14), child: child),
         ),
       ),
     );
