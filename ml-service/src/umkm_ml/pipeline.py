@@ -28,7 +28,7 @@ import pandas as pd
 
 from . import config
 from .evaluate import EvaluationResult, evaluate_models, horizon_report
-from .importer import load_user_data, product_row_counts, summarize
+from .importer import DataImportError, load_inventory, load_user_data, product_row_counts, summarize
 from .models import create_model, default_models
 from .preprocessing import (
     InsufficientDataError,
@@ -92,13 +92,25 @@ def load_dataset(
     """Muat data dan kembalikan (DataFrame mentah, label sumber data).
 
     - `data_path` diisi  -> baca file Excel/CSV milik pengguna.
-    - `data_path` kosong -> pakai data simulasi bawaan.
+    - `data_path` kosong -> pakai dataset default `DEFAULT_SALES_CSV`
+      (retail_sales_ml_apl.csv).
+    - `regenerate=True`  -> buat ulang data SIMULASI dan pakai itu.
+      Sengaja hanya jalan bila diminta eksplisit, agar dataset default
+      tidak pernah tertimpa data simulasi.
     """
+    if regenerate:
+        write_sample_csv(config.SYNTHETIC_SALES_CSV)
+        return load_sales_csv(config.SYNTHETIC_SALES_CSV), DATA_SOURCE_LABEL
+
     if data_path is None:
-        csv_path = config.RAW_SALES_CSV
-        if regenerate or not csv_path.exists():
-            write_sample_csv(csv_path)
-        return load_sales_csv(csv_path), DATA_SOURCE_LABEL
+        default_path = config.DEFAULT_SALES_CSV
+        if not default_path.exists():
+            raise DataImportError(
+                f"Dataset default tidak ditemukan: {default_path}\n"
+                "Letakkan retail_sales_ml_apl.csv di folder data/raw/, "
+                "atau jalankan dengan --data <file>."
+            )
+        return load_user_data(default_path), f"Data default: {default_path.name}"
 
     path = Path(data_path).expanduser().resolve()
     frame = load_user_data(path, sheet=sheet)
@@ -398,6 +410,34 @@ def _inventory_from_raw(raw: pd.DataFrame) -> dict[object, dict[str, float]]:
     return info
 
 
+def _inventory_from_file(
+    path: Path | str | None = None,
+) -> tuple[dict[str, float], str]:
+    """Ambil stok terkini per produk dari file snapshot stok terpisah.
+
+    File inventori (default `retail_inventory_ml_apl.csv`) menyimpan riwayat
+    status stok. Yang dipakai hanya baris `End Date == 9999-12-31`, lalu
+    `Qty on hand` dijumlahkan per produk (satu produk bisa ada di banyak toko).
+
+    Returns
+    -------
+    (dict product_id -> stok, keterangan sumber)
+    """
+    inventory_path = Path(path) if path is not None else config.DEFAULT_INVENTORY_CSV
+    if not inventory_path.exists():
+        return {}, "tidak ada file inventori"
+
+    stock = load_inventory(
+        inventory_path, end_date=config.INVENTORY_OPEN_END_DATE
+    )
+    label = (
+        f"dari {inventory_path.name} "
+        f"(End Date {config.INVENTORY_OPEN_END_DATE}, "
+        f"Qty on hand dijumlahkan per produk)"
+    )
+    return stock, label
+
+
 def run(
     data_path: Path | str | None = None,
     regenerate_data: bool = False,
@@ -415,7 +455,8 @@ def run(
     """Jalankan pipeline untuk semua produk yang ada di data.
 
     `data_path` boleh .xlsx / .xls / .csv milik pengguna. Bila None,
-    pipeline memakai data simulasi bawaan.
+    pipeline memakai dataset default `retail_sales_ml_apl.csv`
+    (`config.DEFAULT_SALES_CSV`).
 
     `limit` membatasi jumlah produk yang diproses (diambil dari produk
     dengan transaksi terbanyak). Berguna untuk data besar: melatih SARIMA
@@ -432,15 +473,26 @@ def run(
     meramal 7 hari, jadi menguji 365 hari tidak relevan.
 
     `current_stock` / `lead_time_days` boleh None. Bila None, pipeline
-    mencoba memakai kolom stok & lead time dari data (lihat
-    `_inventory_from_raw`), lalu jatuh ke asumsi default.
+    mengambil stok dari snapshot inventori (`retail_inventory_ml_apl.csv`,
+    baris `End Date == 9999-12-31`), lalu kolom stok di file penjualan,
+    lalu asumsi default.
     """
     config.ensure_directories()
     raw, source_label = load_dataset(
         data_path, regenerate=regenerate_data, sheet=sheet
     )
 
-    inventory = _inventory_from_raw(raw) if use_data_inventory else {}
+    # --- Stok awal --------------------------------------------------------
+    # Urutan prioritas: snapshot inventori (paling akurat) -> kolom opsional
+    # di file penjualan -> asumsi default.
+    inventory: dict[object, dict[str, float]] = {}
+    inventory_label = "tidak dipakai"
+    file_stock: dict[str, float] = {}
+    if use_data_inventory:
+        inventory = _inventory_from_raw(raw)
+        file_stock, inventory_label = _inventory_from_file()
+        for pid, qty in file_stock.items():
+            inventory.setdefault(pid, {})["stock"] = qty
 
     if product_ids is None:
         # Urutkan dari produk dengan transaksi terbanyak, supaya `limit`
@@ -484,21 +536,43 @@ def run(
             )
         )
 
-    stock_source = (
-        "dari data (kolom stock_on_hand)"
-        if current_stock is None and inventory
-        else f"asumsi {config.DEFAULT_CURRENT_STOCK:.0f} unit"
-    )
     lead_source = (
         "dari data (kolom lead_time_days)"
         if lead_time_days is None and any("lead_time" in v for v in inventory.values())
         else f"asumsi {config.DEFAULT_LEAD_TIME_DAYS} hari"
     )
 
+    if current_stock is not None:
+        stock_source = f"argumen --stock ({current_stock:.0f} unit)"
+    elif file_stock:
+        covered = sum(1 for pid in product_ids if pid in file_stock)
+        stock_source = (
+            f"{inventory_label}; {covered}/{total} produk punya stok di file, "
+            f"sisanya asumsi {config.DEFAULT_CURRENT_STOCK:.0f} unit"
+        )
+    elif inventory:
+        stock_source = "dari data (kolom stock_on_hand)"
+    else:
+        stock_source = f"asumsi {config.DEFAULT_CURRENT_STOCK:.0f} unit"
+
+    if data_path is None:
+        used_file = (
+            config.SYNTHETIC_SALES_CSV if regenerate_data else config.DEFAULT_SALES_CSV
+        )
+    else:
+        used_file = Path(data_path)
+
     summary = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "data_source": source_label,
-        "data_file": _rel(Path(data_path)) if data_path else _rel(config.RAW_SALES_CSV),
+        "data_file": _rel(used_file),
+        "inventory_file": _rel(config.DEFAULT_INVENTORY_CSV)
+        if file_stock
+        else None,
+        "inventory_products": len(file_stock),
+        "inventory_open_end_date": config.INVENTORY_OPEN_END_DATE
+        if file_stock
+        else None,
         "dataset_summary": summarize(raw),
         "total_products_in_file": int(raw["product_id"].nunique()),
         "products_processed": total,

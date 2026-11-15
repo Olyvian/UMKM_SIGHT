@@ -3,19 +3,57 @@
 Pipeline peramalan permintaan (time series forecasting) untuk memprediksi
 kapan stok produk UMKM akan habis.
 
-> **Catatan penting:** pipeline bisa memakai data simulasi
-> (`src/umkm_ml/synthetic_data.py`) **atau** file sendiri (Excel/CSV).
-> Ada tiga dataset uji di repo ini, dan **asalnya berbeda** — jangan
-> tertukar saat menulis laporan:
->
-> | Bagian | File | Asal data | Untuk apa |
-> |---|---|---|---|
-> | 5b | `dataset_umkm_sembako.csv` | publik (Favorita, dipetakan ulang) | contoh data ritel nyata yang berisik |
-> | 5c | `store_item_demand.csv` | publik (Store Item Demand, unduhan) | **contoh terbaik**: ada pola yang bisa dipelajari |
-> | 5d | `indian_FMCG_...csv` | publik, **acak murni** | hanya untuk menguji logika stok |
->
-> Tidak satu pun dari ketiganya transaksi UMKM nyata. Angka di README ini
-> adalah hasil pengukuran pada file tersebut, bukan janji akurasi untuk tokomu.
+## Dataset yang dipakai
+
+Pipeline ini memakai **dua file** di `data/raw/`:
+
+| File | Peran | Isi |
+|---|---|---|
+| `retail_sales_ml_apl.csv` | **sumber penjualan** | 125.751 baris, 2.326 produk, 40 toko, 2025-06-01 s/d 2026-04-24 |
+| `retail_inventory_ml_apl.csv` | **sumber stok** | 284.755 baris riwayat stok; 22.701 baris berstatus terkini |
+
+Kolom yang dibaca dari file penjualan:
+
+| Kolom | Dipakai sebagai |
+|---|---|
+| `Transaction Date` | tanggal transaksi |
+| `Product No` | identitas produk |
+| `Product Description` | nama produk (untuk tampilan) |
+| `Qty Sold` | jumlah terjual |
+| `Is Return` | penanda retur (1 = retur, dibuang) |
+
+Kolom yang dibaca dari file inventori:
+
+| Kolom | Dipakai sebagai |
+|---|---|
+| `Product No` | identitas produk |
+| `Qty on hand` | jumlah stok |
+| `End Date` | **filter**: hanya baris `9999-12-31` yang dianggap stok terkini |
+
+> **Penting soal asal data.** Kedua file ini bukan transaksi UMKM nyata.
+> Semua angka di README ini adalah hasil pengukuran pada file tersebut, bukan
+> janji akurasi untuk tokomu. Validasi sesungguhnya baru terjadi setelah data
+> toko sendiri dijalankan.
+
+### Kenapa stok diambil dari file terpisah
+
+File penjualan **tidak** menyimpan stok. Stok ada di file inventori yang
+bentuknya berbeda: satu produk muncul berkali-kali, sekali untuk setiap toko,
+dan beberapa kali untuk periode yang berbeda.
+
+Aturannya:
+
+1. Ambil hanya baris dengan `End Date == "9999-12-31"`. Tanggal ini adalah
+   penanda "stok masih berlaku". Tanggal lain adalah riwayat periode yang
+   sudah berakhir — kalau ikut dijumlahkan, stoknya akan berlipat salah.
+2. Jumlahkan `Qty on hand` per produk lintas toko. Ini konsisten dengan data
+   penjualan yang juga dijumlahkan lintas toko untuk produk yang sama.
+3. Stok negatif dijadikan 0. Di data ini ada 321 baris negatif — itu
+   ketidakcocokan pencatatan, bukan stok minus yang nyata.
+
+Hasilnya: **1.965 produk** punya stok terkini. Produk yang tidak ada di file
+inventori memakai asumsi default 20 unit, dan hal itu ditulis di output
+supaya tidak tersembunyi.
 
 ## 1. Pipeline itu apa?
 
@@ -28,7 +66,8 @@ Pipeline di project ini punya 6 stasiun:
 ```
 [1] Data mentah        transaksi penjualan (satu baris = satu item terjual)
         |
-[2] Praproses          buang retur, jumlahkan per tanggal, isi hari kosong = 0,
+[2] Praproses          buang retur (Qty Sold negatif ATAU Is Return = 1),
+        |              jumlahkan per tanggal, isi hari kosong = 0,
         |              tolak kalau riwayat < 28 hari
 [3] Split waktu        semua data kecuali 28 hari terakhir untuk latih,
         |              28 hari terakhir untuk uji (lihat bagian 8)
@@ -36,7 +75,7 @@ Pipeline di project ini punya 6 stasiun:
         |              SARIMA, SARIMA-trend; pilih MAE terkecil
 [5] Ramalkan           model terbaik dilatih ulang pada SEMUA data, lalu
         |              memprediksi 7 hari ke depan
-[6] Estimasi stok       aritmatika kumulatif: kapan prediksi permintaan
+[6] Estimasi stok      aritmatika kumulatif: kapan prediksi permintaan
         |              melewati stok saat ini  ->  tanggal stok habis
         v
    Artefak JSON + grafik PNG + model .pkl
@@ -58,6 +97,12 @@ adalah **aritmatika biasa** yang memakai angka prediksi tadi (lihat
 `src/umkm_ml/stockout.py`). Ini pemisahan yang penting dan sering
 ditanyakan saat presentasi.
 
+| Bagian | Dikerjakan oleh | File |
+|---|---|---|
+| Prediksi permintaan harian | Model ML | `models.py`, `evaluate.py` |
+| Hitung kapan stok habis | Aritmatika | `stockout.py` |
+| Tentukan perlu alert | Aturan bisnis (lead time) | `stockout.py` |
+
 ## 3. Struktur folder
 
 ```text
@@ -66,12 +111,12 @@ ml-service/
 ├── README.md                     # dokumen ini
 ├── scripts/
 │   ├── run_pipeline.py           # entry point CLI
-│   ├── download_dataset.py       # unduh dataset contoh yang layak
+│   ├── download_dataset.py       # unduh dataset contoh publik (opsional)
 │   └── make_template.py          # pembuat template Excel kosong
 ├── src/umkm_ml/
-│   ├── config.py                 # semua konstanta & asumsi
-│   ├── synthetic_data.py         # pembuat data simulasi
-│   ├── importer.py               # pembaca Excel/CSV milik pengguna
+│   ├── config.py                 # semua konstanta, asumsi & lokasi dataset
+│   ├── synthetic_data.py         # pembuat data simulasi (untuk --regenerate)
+│   ├── importer.py               # pembaca Excel/CSV + pembaca snapshot stok
 │   ├── preprocessing.py          # transaksi -> deret harian tanpa lubang
 │   ├── metrics.py                # MAE, RMSE, MAPE, WAPE
 │   ├── models.py                 # 5 model (lihat bagian 7)
@@ -99,331 +144,180 @@ venv\Scripts\activate          # Windows
 # source venv/bin/activate     # Linux/macOS
 
 python -m pip install -r requirements.txt
+```
 
-# jalankan pipeline dengan data simulasi
-python scripts/run_pipeline.py --regenerate
+Perintah utama. **Tanpa argumen, pipeline memakai dataset default**
+(`retail_sales_ml_apl.csv` + `retail_inventory_ml_apl.csv`):
+
+```bash
+# cek dulu isi file (cepat, ±5 detik)
+python scripts/run_pipeline.py --inspect
+
+# uji 10 produk teratas (±18 detik)
+python scripts/run_pipeline.py --limit 10
+
+# jalankan 100 produk (±3 menit)
+python scripts/run_pipeline.py --limit 100
 
 # ubah horizon / stok / lead time
-python scripts/run_pipeline.py --horizon 14 --stock 50 --lead-time 5
+python scripts/run_pipeline.py --limit 10 --horizon 14 --stock 50 --lead-time 5
 
-# uji model untuk horizon lain (default 28 hari terakhir)
-python scripts/run_pipeline.py --eval-horizon 7
+# abaikan stok dari file inventori, pakai asumsi default 20 unit
+python scripts/run_pipeline.py --limit 10 --ignore-data-inventory
 
-# jalankan test
+# jalankan test (40 unit test, ±5 detik)
 python -m pytest tests -q
 ```
 
-### 4a. Dataset contoh yang bisa diunduh
-
-Kalau belum punya data sendiri dan ingin melihat pipeline bekerja pada data
-yang **punya pola nyata** (bukan simulasi):
+Untuk melihat perilaku pipeline tanpa menyentuh data asli, pakai data
+simulasi:
 
 ```bash
-python scripts/download_dataset.py          # 2 toko x 15 produk
-python scripts/download_dataset.py --stores 3 --items 20
+python scripts/run_pipeline.py --regenerate --limit 1
 ```
 
-Script ini mengunduh *Store Item Demand Forecasting* (10 toko × 50 item,
-5 tahun), mengambil sebagian, lalu menyimpannya sebagai
-`data/raw/store_item_demand.csv` dalam format baku pipeline. Hasilnya
-langsung bisa dijalankan:
+### 4a. Berapa lama?
 
-```bash
-python scripts/run_pipeline.py --data "data/raw/store_item_demand.csv"
-```
-
-## 5. Cara memasukkan data Excel kamu sendiri
-
-Ada tiga langkah. Jangan langsung percaya angka sebelum langkah 2 selesai.
-
-**Langkah 1 — Isi template.** Buat file template kosong, lalu buka di Excel:
-
-```bash
-python scripts/make_template.py
-```
-
-File muncul di `data/templates/template_transaksi.xlsx`. Ada 3 sheet:
-
-| Sheet | Isi |
-|---|---|
-| `Petunjuk` | cara pengisian (tidak dibaca pipeline) |
-| `Transaksi` | tempat kamu mengisi data asli |
-| `Contoh 60 Hari` | contoh data terisi, untuk uji coba cepat |
-
-Kolom yang wajib ada di sheet `Transaksi`:
-
-| Kolom | Contoh | Keterangan |
-|---|---|---|
-| `Tanggal` | `2026-10-01` | tanggal transaksi, format `YYYY-MM-DD` |
-| `Produk` | `Kopi Sachet` | nama atau kode produk (boleh diulang) |
-| `Jumlah Terjual` | `5` | jumlah laku hari itu (angka) |
-
-Kolom **opsional** (kalau ada, dipakai untuk perhitungan stok):
-
-| Kolom | Contoh | Keterangan |
-|---|---|---|
-| `Stok` / `Stock_On_Hand` | `120` | stok saat ini; menggantikan asumsi 20 unit |
-| `Lead_Time_Days` | `7` | lama pengadaan; menggantikan asumsi 3 hari |
-| `Reorder_Level` | `30` | titik reorder (belum dipakai di perhitungan, hanya dibaca) |
-
-Kalau kolom stok tidak ada, pipeline memakai asumsi default dan
-menuliskannya di output (`stok awal asumsi 20 unit`). Kalau ada, output
-akan menulis `stok awal dari data (kolom stock_on_hand)`. Untuk memaksa
-asumsi default walaupun kolomnya ada, pakai `--ignore-data-inventory`.
-
-Nama kolom boleh berbahasa Indonesia atau Inggris. Pipeline mengenali
-`Tanggal`/`Date`, `Jumlah`/`Qty`/`Quantity`, `Produk`/`Product`/`SKU`, dan
-beberapa variasi lain (lihat `COLUMN_ALIASES` di `src/umkm_ml/importer.py`).
-Bentuk tabel lebar (tanggal di kolom pertama, nama produk jadi judul kolom)
-juga otomatis dikenali.
-
-**Langkah 2 — Cek dulu isinya.** Selalu jalankan ini sebelum memproses,
-supaya kamu tahu file benar-benar terbaca dan kolomnya cocok:
-
-```bash
-python scripts/run_pipeline.py --data "data/raw/data_anda.xlsx" --inspect
-```
-
-Outputnya menunjukkan sheet yang dipakai, jumlah baris, ringkasan tiap
-produk (tanggal awal/akhir, total qty), dan 5 baris pertama. Kalau di sini
-sudah salah, jangan lanjut.
-
-**Langkah 3 — Jalankan pipeline:**
-
-```bash
-python scripts/run_pipeline.py --data "data/raw/data_anda.xlsx"
-
-# kalau file punya banyak sheet dan kamu mau pilih satu:
-python scripts/run_pipeline.py --data "data/raw/data_anda.xlsx" --sheet "Transaksi"
-
-# hanya satu produk tertentu (berdasarkan nama atau ID):
-python scripts/run_pipeline.py --data "data/raw/data_anda.xlsx" --product "Kopi Sachet"
-
-# abaikan kolom stok/lead time di data, pakai asumsi default:
-python scripts/run_pipeline.py --data "data/raw/data_anda.xlsx" --ignore-data-inventory
-```
-
-Aturan data yang harus dipenuhi:
-
-- **Minimal 28 hari riwayat per produk.** Di bawah itu pipeline menjawab
-  `insufficient_data` — sengaja tidak mengarang prediksi.
-- Hari tanpa penjualan **jangan dihapus**; kosongkan saja, pipeline mengisi 0.
-- Retur/pembatalan tulis sebagai angka **negatif**; pipeline membuangnya.
-- Urutan baris bebas; pipeline mengurutkan sendiri.
-
-> **Penting soal angka MAE.** MAE 2.79 yang disebut sebelumnya berasal dari
-> **data simulasi**, bukan dari file Excel kamu. Setelah menjalankan langkah
-> di atas dengan data sendiri, angka MAE akan berbeda — itulah angka yang
-> benar-benar mewakili tokomu. Jangan pakai angka dari README ini untuk
-> laporan tanpa menjalankan datamu sendiri.
-
-### 5a. Kalau datamu besar (puluhan ribu baris)
-
-File 70.000 baris **tidak masalah** — pandas menanganinya dengan ringan.
-Yang menentukan lama proses bukan jumlah baris, tapi **jumlah produk**,
-karena SARIMA dilatih terpisah untuk setiap produk (dua kali: sekali untuk
-evaluasi, sekali untuk ramalan akhir).
-
-Hasil pengukuran nyata di mesin ini (file uji 125.000 baris, 120 produk,
-masing-masing punya riwayat 2 tahun):
+Diukur di mesin ini, 5 model lengkap dengan SARIMA:
 
 | Tahap | Waktu |
 |---|---|
-| Membaca file `.xlsx` 125.000 baris | ± 12 detik |
-| Proses 1 produk (riwayat 730 hari), dengan SARIMA | ± 2,6 detik |
-| Proses 1 produk, `--no-sarima` | ± 0,4 detik |
-| 120 produk lengkap, dengan SARIMA | ± 5–6 menit |
-| 120 produk lengkap, `--no-sarima` | ± 1 menit |
+| `--inspect` (125.751 baris) | ±5 detik |
+| 10 produk | ±18 detik |
+| 100 produk | ±3,2 menit |
+| 1 produk | ±1,9 detik |
+| **2.326 produk (semua)** | **±75 menit** |
 
-Urutan yang disarankan untuk data besar:
+Lama proses ditentukan oleh **jumlah produk**, bukan jumlah baris, karena
+SARIMA dilatih terpisah untuk setiap produk (dua kali: sekali untuk evaluasi,
+sekali untuk ramalan akhir).
 
-```bash
-# 1. Taruh file di data/raw/ (folder ini diabaikan git, jadi tidak ter-commit)
-#    Contoh: ml-service/data/raw/penjualan_toko.xlsx
+**Saran urutan untuk data besar:** `--inspect` → `--limit 5` → `--limit 30`
+→ baru semuanya. Jangan langsung menjalankan 2.326 produk.
 
-# 2. Cek isinya. Ini cepat (± 10 detik) dan menunjukkan jumlah produk.
-python scripts/run_pipeline.py --data "data/raw/penjualan_toko.xlsx" --inspect
+## 5. Hasil nyata pada dataset ini (100 produk)
 
-# 3. Uji 5 produk terbesar dulu
-python scripts/run_pipeline.py --data "data/raw/penjualan_toko.xlsx" --limit 5
-
-# 4. Kalau hasilnya masuk akal, jalankan semuanya
-python scripts/run_pipeline.py --data "data/raw/penjualan_toko.xlsx"
-
-# Opsi cepat kalau tidak sabar menunggu SARIMA:
-python scripts/run_pipeline.py --data "data/raw/penjualan_toko.xlsx" --no-sarima
-```
-
-Saat dijalankan, pipeline mencetak kemajuan per produk:
-
-```text
-[1/120] memproses produk: PRD-089
-[2/120] memproses produk: PRD-056
-```
-
-**Yang harus diwaspadai:** kalau `--inspect` melaporkan jumlah produk yang
-tidak masuk akal (mis. 70.000 produk untuk 70.000 baris), berarti kolom
-produk salah terbaca — kemungkinan ada kolom seperti nomor transaksi yang
-dikira nama produk. Perbaiki dulu nama kolomnya sebelum menjalankan model.
-Pipeline akan memberi peringatan otomatis bila produknya lebih dari 50.
-
-Tips lain: file `.csv` dibaca jauh lebih cepat daripada `.xlsx`. Kalau
-datanya besar dan tidak butuh format Excel, simpan sebagai CSV.
-
-### 5b. Hasil nyata pada `dataset_umkm_sembako.csv` (44 produk)
-
-Ini hasil pipeline pada dataset yang ada di `data/raw/`. Bukan simulasi.
+Ini hasil pengukuran, bukan perkiraan. 100 produk dengan transaksi terbanyak,
+dijalankan dengan 5 model lengkap.
 
 | Hal | Hasil |
 |---|---|
-| Baris terbaca | 73.251 |
-| Produk | 44 (semua berhasil diproses) |
-| Rentang data | 2013-01-02 s/d 2017-08-15 |
-| Waktu proses (5 model, semua produk) | ± 4,5 menit |
-| Waktu proses (`--no-sarima`) | ± 1 menit |
+| Baris mentah diproses | 27.160 |
+| Retur dibuang | 1.531 baris |
+| Hari kosong diisi 0 | 15.110 hari |
+| Produk berhasil | 100 dari 100 |
+| Waktu proses | 191,7 detik |
+| Produk yang punya stok di file inventori | 93 dari 100 |
 
-Model terbaik per produk: `sarima_trend` 15 produk, `moving_average` 10,
-`sarima` 7, `naive` 7, `seasonal_naive` 5.
+Model terbaik per produk: `naive` **49**, `sarima` **25**, `sarima_trend` **11**,
+`seasonal_naive` **11**, `moving_average` **4**.
 
-Akurasi model terbaik, dipotong menurut horizon (median 44 produk):
+### 5a. Akurasi — dan kenapa angkanya buruk
 
-| Horizon | WAPE median | MAPE median | WAPE ≤ 20% | WAPE ≤ 30% | WAPE ≤ 50% |
-|---|---|---|---|---|---|
-| 7 hari | **47,3%** | 48,0% | 1/44 | 7/44 | 22/44 |
-| 14 hari | 51,3% | 52,4% | 0/44 | 6/44 | 20/44 |
-| 28 hari | 53,0% | 61,6% | 0/44 | 3/44 | 20/44 |
+| Horizon | WAPE median | MAE median | Lolos ≤20% | Lolos ≤50% |
+|---|---|---|---|---|
+| 7 hari | **100,0%** | 0,57 | 0/82 | 5/82 |
+| 14 hari | 100,0% | 0,57 | 0/90 | 2/90 |
+| 28 hari | 100,0% | 0,52 | 0/100 | 2/100 |
 
-Produk terbaik pada 7 hari mencapai WAPE 15,6%; terburuk 400% (penjualan
-sangat kecil di periode uji sehingga selisih beberapa unit saja sudah
-menjadi error raksasa).
+**48 dari 82 produk WAPE-nya persis 100%.** Angka yang seragam seperti itu
+bukan kebetulan: artinya model memprediksi **0 unit untuk semua hari**, dan
+memang begitu adanya — bukan bug.
 
-**Temuan jujur: target akurasi ≤ 20% TIDAK tercapai pada dataset ini.**
-Hanya 1 dari 44 produk yang di bawah WAPE 20%, dan itu pun pada horizon
-7 hari.
+Perhatikan anomali yang mencolok: **MAE median hanya 0,57 unit**, tetapi WAPE
+100%. Keduanya benar sekaligus. MAE 0,57 berarti model meleset kurang dari
+satu unit per hari — sangat baik. Tetapi kalau penjualan aktualnya juga hanya
+0,5 unit per hari, maka `total_error / total_aktual = 1` alias 100%.
 
-> **Catatan metode.** Sebelumnya README ini melaporkan WAPE median 59,2%
-> karena model diuji pada 337 hari terakhir (20% data). Setelah evaluasi
-> diperbaiki ke 28 hari — sesuai kebutuhan aplikasi yang hanya meramal
-> 7 hari — angkanya membaik menjadi 47,3% pada horizon 7 hari. Perbaikan
-> ini bukan "membuat angka bagus", tetapi mengukur tugas yang benar.
+### 5b. Penyebabnya: permintaan terlalu jarang
 
-Kenapa? Bukan karena kodenya salah, tapi karena sifat datanya:
+Diukur pada 100 produk dengan transaksi terbanyak:
 
-1. **Penjualan harian sangat berisik.** Contoh PRD-028: 5, lalu 80, lalu 9
-   buah pada hari-hari berurutan tanpa pola promo. Tidak ada model yang bisa
-   menebak lonjakan seperti itu dari riwayat.
-2. **Ada tren turun kuat.** Rata-rata penjualan seluruh produk turun dari
-   20,1 (2013) menjadi 9,8 (2017) per hari. Model tanpa diferensiasi terus
-   meramal terlalu tinggi — itulah sebabnya `sarima_trend` ditambahkan.
-3. **Banyak hari bernilai sangat kecil.** Pada produk seperti PRD-023
-   (median 5 buah/hari), selisih 2 buah saja sudah menjadi error 40%.
-   MAPE membesar-besarkan hal ini; WAPE lebih adil.
-
-Yang **berhasil** dilakukan model: menangkap level permintaan dan pola
-mingguan (Minggu tertinggi, Rabu terendah). Yang tidak tertangkap adalah
-naik-turun harian yang tidak punya pola.
-
-> Angka lama "PRD-001 rata-rata aktual 29,5 vs ramalan 30,8 per hari" dan
-> "agregasi mingguan PRD-001 40% → 24,5%" diukur pada evaluasi 337 hari
-> yang sudah dibuang. Angka itu tidak dipakai lagi sebagai bukti.
-
-**Catatan penting:** data berakhir 2017-08-15, jadi ramalan berlaku untuk
-16–22 Agustus 2017 — bukan hari ini. Pipeline sekarang memberi peringatan
-otomatis bila data terakhir lebih dari 30 hari yang lalu.
-
-**Catatan tentang asal data:** kolom `item_nbr_asal`, `sedang_promo`, dan
-rentang 2013-01-02 s/d 2017-08-15 sangat mirip dataset publik *Corporación
-Favorita Grocery Sales* (Kaggle), yang dipetakan ulang dengan nama produk
-sembako Indonesia. Kalau ini untuk laporan, sebutkan sumber aslinya —
-jangan diklaim sebagai transaksi UMKM nyata.
-
-### 5c. Hasil pada `store_item_demand.csv` (30 produk, data contoh terbaik)
-
-Ini dataset publik *Store Item Demand Forecasting* (10 toko × 50 item,
-2013–2017), diambil 2 toko × 15 item oleh `scripts/download_dataset.py`.
-Bukan data UMKM, tetapi **punya pola yang benar-benar bisa dipelajari**.
-Buktinya diukur pada file ini:
-
-| Pemeriksaan | Hasil | Artinya |
-|---|---|---|
-| Autokorelasi lag-1 | **0,575** | hari ini benar-benar dipengaruhi kemarin |
-| Rata-rata per hari (Sen→Min) | 1.469 → 2.202 | pola mingguan kuat, naik menjelang akhir pekan |
-| Rata-rata per tahun | 1.544 (2013) → 2.085 (2017) | tren naik nyata |
-| Rata-rata per bulan | 1.258 (Jan) … 2.371 (Jul) | musim tahunan |
-
-Bandingkan dengan file FMCG di bagian 5d (autokorelasi −0,008). Inilah
-bedanya data yang bisa diramal dan yang tidak.
-
-| Hal | Hasil |
+| Pemeriksaan | Hasil |
 |---|---|
-| Baris | 54.780 |
-| Produk | 30 (Toko1–Toko2 × Item 01–15) |
-| Rentang data | 2013-01-01 s/d 2017-12-31 (1.826 hari) |
-| Rata-rata | 61,7 unit/hari per produk |
-| Waktu proses (5 model, 30 produk) | ± 178 detik |
+| Rata-rata penjualan per hari | median **0,77 unit** |
+| Proporsi hari tanpa penjualan | median **56%** |
+| Produk dengan rata-rata < 1 unit/hari | **66 dari 100** |
+| Produk dengan rata-rata < 2 unit/hari | **93 dari 100** |
+| Transaksi per produk (seluruh 2.326) | median **38 baris** |
+| Produk dengan ≤ 50 transaksi | 1.527 dari 2.326 |
 
-Model terbaik per produk: `naive` 11 produk, `moving_average` 10,
-`sarima_trend` 9.
+Kalau sebuah produk laku 0,77 unit per hari dan 56% harinya nol, maka
+prediksi yang paling masuk akal secara statistik **memang 0**. Model tidak
+sedang rusak; dia sedang mengatakan hal yang benar tentang data yang sangat
+jarang.
 
-Akurasi model terbaik, dipotong menurut horizon (median 30 produk):
+### 5c. Yang berhasil: akurasi ikut volume
 
-| Horizon | WAPE median | WAPE ≤ 20% | WAPE ≤ 30% |
-|---|---|---|---|
-| 7 hari | **20,6%** | 13/30 | 27/30 |
-| 14 hari | 20,1% | 15/30 | 27/30 |
-| 28 hari | 19,8% | 16/30 | 29/30 |
+Ini temuan paling berguna dari dataset ini. Saya agregasi penjualan ke level
+**Product Subcategory** (51 unit), lalu ukur akurasi menurut volume:
 
-Produk terburuk pada 7 hari masih 33–35% (Toko2-Item03, Toko2-Item01,
-Toko1-Item10). Jadi kalimat yang jujur: **median mendekati target 20%,
-tetapi belum semua produk lolos.**
-
-Kenapa `naive` (besok = hari ini) menang di 11 dari 30 produk? Karena
-permintaan item di dataset ini relatif stabil; kalau hari ini 60, besok
-memang sekitar 60. Itu bukan kelemahan pipeline — justru bukti baseline
-dipakai sebagaimana mestinya, dan SARIMA hanya dipilih saat benar-benar
-lebih baik.
-
-Bandingkan dengan `dataset_umkm_sembako.csv` (bagian 5b): WAPE median 47,3%
-pada evaluasi dan horizon yang sama (7 hari). Perbedaan besar ini
-menunjukkan bahwa **kualitas data menentukan batas akurasi**, bukan
-kerumitan model.
-
-### 5d. `indian_FMCG_retail_sales_customer_inventory.csv`: acak, jangan untuk akurasi
-
-File ini 100.000 baris, 64 kombinasi `Category × Brand`, tahun 2024. Terlihat
-lengkap (harga, stok, lead time, pelanggan), tetapi **penjualannya acak
-murni**. Bukti yang sudah diukur:
-
-| Pemeriksaan | Hasil | Artinya |
+| Volume | Jumlah unit | WAPE median |
 |---|---|---|
-| Distribusi `Units` | 1–5 masing-masing ~20% | persis Uniform(1–5), seperti dadu |
-| Autokorelasi lag-1 | −0,008 | hari ini tidak berhubungan dengan kemarin |
-| Autokorelasi lag-7 | −0,003 | tidak ada pola mingguan |
-| Rata-rata per hari (Sen–Min) | 12,92–13,14 | tidak ada beda |
-| Korelasi dengan waktu | −0,011 | tidak ada tren |
+| < 2 unit/hari | 22 | 100,0% |
+| 2–5 unit/hari | 8 | 74,2% |
+| 5–10 unit/hari | 7 | 50,4% |
+| 10–20 unit/hari | 10 | **39,5%** |
+| ≥ 20 unit/hari | 4 | **32,2%** |
 
-Uji langsung ke pipeline: model terbaik hanya **0,99× lebih baik** daripada
-sekadar menebak rata-rata data latih. Batas teoretisnya juga sudah dihitung:
-MAD 5,48 unit/hari dibagi rata-rata 13,01 unit/hari = **WAPE minimum 42,1%**.
-Model apa pun tidak bisa mengalahkan angka itu karena tidak ada pola untuk
-dipelajari.
+Korelasi `log(volume)` vs WAPE = **−0,751**. Semakin ramai permintaannya,
+semakin akurat ramalannya. Ini hubungan yang kuat dan masuk akal: produk yang
+laku 1 unit/hari punya sinyal terlalu tipis untuk dipelajari.
 
-Jadi jangan pakai file ini untuk mengukur akurasi. **Yang berguna** adalah
-tiga kolomnya: `Stock_On_Hand`, `Reorder_Level`, `Lead_Time_Days`. Pipeline
-sekarang otomatis memakainya:
+Contoh unit terbaik (level subkategori):
 
-```bash
-python scripts/run_pipeline.py --data "data/raw/indian_FMCG_retail_sales_customer_inventory.csv" --limit 3
-```
+| Unit | Rata-rata | WAPE 7 hari |
+|---|---|---|
+| Scholar Footwear Modern Legend Summit | 35,1 u/h | **25,0%** |
+| Scholar Footwear Flight Classic Zephyr | 28,7 u/h | **27,1%** |
+| Femme Footwear Court Casual Trident | 9,6 u/h | 30,1% |
+| Scholar Footwear Court Casual Trident | 11,2 u/h | 31,7% |
 
-Output akan menulis `Asumsi: stok awal dari data (kolom stock_on_hand),
-lead time dari data (kolom lead_time_days)` — bukan lagi asumsi 20 unit /
-3 hari. Ini cara menguji logika stok habis & alert dengan angka nyata,
-tanpa berpura-pura ramalannya akurat.
+Dari 51 subkategori: **2 lolos ≤30%**, **14 lolos ≤50%**, median 67,1%.
+Kalau diambil 10 subkategori bervolume tertinggi, median WAPE-nya **37,9%**.
+
+**Kesimpulan yang jujur: target ≤20% TIDAK tercapai pada dataset ini, bahkan
+setelah agregasi.** Yang bisa diklaim hanya: pada unit bervolume tinggi,
+error turun ke kisaran 25–40%.
+
+### 5d. Bandingkan dengan data yang punya pola
+
+Untuk menunjukkan bahwa masalahnya ada di data dan bukan di kode, pipeline
+yang sama pernah diuji pada *Store Item Demand Forecasting* (data publik
+Kaggle, 2 toko × 15 item, 2013–2017):
+
+| Dataset | Autokorelasi lag-1 | WAPE median 7 hari |
+|---|---|---|
+| Store Item Demand (punya pola) | **0,575** | **20,6%** |
+| Dataset retail sekarang (jarang) | rendah | 100% (level produk) |
+| Dataset FMCG acak (kontrol negatif) | **−0,008** | batas teoretis 42,1% |
+
+Dataset itu punya rata-rata **61,7 unit/hari per produk** dan autokorelasi
+0,575 — hari ini benar-benar dipengaruhi kemarin. Di sana WAPE median 20,6%
+dan 13 dari 30 produk lolos target.
+
+Perbedaan besar ini menunjukkan hal yang sama berulang kali:
+**kualitas dan kepadatan data menentukan batas akurasi, bukan kerumitan
+model.** Untuk mengulanginya, `scripts/download_dataset.py` masih tersedia.
 
 ## 6. Keluaran
 
-`artifacts/pipeline_summary.json` — ringkasan semua produk.
+`artifacts/pipeline_summary.json` — ringkasan semua produk. Field penting:
+
+```json
+{
+  "data_source": "Data default: retail_sales_ml_apl.csv",
+  "data_file": "data\\raw\\retail_sales_ml_apl.csv",
+  "inventory_file": "data\\raw\\retail_inventory_ml_apl.csv",
+  "inventory_products": 1965,
+  "inventory_open_end_date": "9999-12-31",
+  "data_last_date": "2026-04-24",
+  "data_age_days": 205,
+  "assumptions": {
+    "current_stock_source": "dari retail_inventory_ml_apl.csv (End Date 9999-12-31, Qty on hand dijumlahkan per produk); 93/100 produk punya stok di file, sisanya asumsi 20 unit"
+  }
+}
+```
 
 Per produk:
 
@@ -434,42 +328,37 @@ Per produk:
 | `product_<id>_model.pkl` | model terbaik yang siap dipakai ulang |
 | `product_<id>_report.png` | grafik aktual vs prediksi + proyeksi kumulatif |
 
-`accuracy_by_horizon` menjawab pertanyaan "seberapa akurat untuk 7 hari ke
-depan?" secara langsung, karena model sudah memprediksi seluruh 28 hari uji
-sekaligus; angkanya hanya dipotong per horizon, tanpa pelatihan ulang.
-
-```json
-"accuracy_by_horizon": {
-  "7_hari":  { "mae": 3.8571, "rmse": 5.5934, "mape": 0.3431, "wape": 0.2143 },
-  "14_hari": { "mae": 3.6429, "rmse": 4.7734, "mape": 0.2842, "wape": 0.2099 },
-  "28_hari": { "mae": 4.1786, "rmse": 5.5324, "mape": 0.3725, "wape": 0.2505 }
-}
-```
-
-(Contoh nyata: `Toko1-Item01` dari `store_item_demand.csv`.)
-
-Contoh `forecast.json`:
+Contoh `forecast.json` (nyata, produk `PROD-100805`, stok 177 unit):
 
 ```json
 {
-  "product_id": 1,
-  "model": "moving_average",
+  "product_id": "PROD-100805",
+  "model": "sarima_trend",
   "horizon_days": 7,
   "predictions": [
-    { "date": "2026-06-30", "predicted_qty": 7.571 }
+    { "date": "2026-04-25", "predicted_qty": 14.28 },
+    { "date": "2026-04-26", "predicted_qty": 4.04 }
   ],
   "stockout": {
-    "status": "will_run_out",
-    "days_until_stockout": 3,
-    "estimated_date": "2026-07-02",
-    "current_stock": 20,
+    "status": "sufficient",
+    "current_stock": 177.0,
     "lead_time_days": 3,
-    "should_alert": true
+    "should_alert": false,
+    "message": "Stok diperkirakan cukup selama horizon prediksi (7 hari ke depan)."
   }
 }
 ```
 
 Bentuk inilah yang nanti dikirim backend Laravel ke aplikasi Flutter.
+
+### Status stockout pada 100 produk
+
+| Status | Jumlah | Arti |
+|---|---|---|
+| `sufficient` | 89 | stok cukup selama horizon |
+| `will_run_out` | 10 | stok habis dalam horizon |
+| `out_of_stock` | 1 | stok sudah 0 |
+| **Alert dikirim** | **6** | habis dalam ≤ lead time (3 hari) |
 
 ## 7. Model yang dipakai
 
@@ -485,11 +374,10 @@ Baseline ada bukan untuk dipamerkan, tetapi untuk **membuktikan** model
 rumit layak dipakai. Kalau SARIMA kalah dari moving average, jawabannya
 jujur: "model kompleks tidak memberi nilai tambah pada data ini".
 
-Pada `dataset_umkm_sembako.csv`, ini benar-benar terjadi: `moving_average`
-menang di 10 dari 44 produk, dan `naive` menang di 7 produk. Pada
-`store_item_demand.csv` lebih ekstrem lagi: `naive` menang di 11 dari 30
-produk. Itu hasil yang sah dan justru menunjukkan evaluasinya tidak diatur
-supaya SARIMA menang.
+Pada dataset ini hal itu benar-benar terjadi: `naive` menang di **49 dari 100
+produk**. Itu bukan kelemahan pipeline — justru bukti baseline dipakai
+sebagaimana mestinya, dan bahwa permintaan produk-produk ini memang terlalu
+datar untuk dimodelkan lebih rumit.
 
 ## 8. Aturan evaluasi yang tidak boleh dilanggar
 
@@ -497,17 +385,12 @@ supaya SARIMA menang.
    dari data latih.
 2. **Data uji = 28 hari terakhir, bukan 20% data.** Aplikasi hanya meramal
    7 hari. Menguji model pada 365 hari ke depan membuat hasil terlihat jauh
-   lebih buruk daripada tugas sebenarnya, lalu kesimpulannya salah. Ini
-   pernah terjadi di project ini: pada PRD-002 `dataset_umkm_sembako.csv`,
-   WAPE 7 hari 22,1% tetapi WAPE 337 hari 49,2%. Angka 28 hari dipakai agar
-   tidak bergantung pada satu minggu yang kebetulan ramai/sepi; rincian
-   7/14/28 hari dilaporkan terpisah di `accuracy_by_horizon`.
+   lebih buruk daripada tugas sebenarnya, lalu kesimpulannya salah.
 3. **MAPE tidak dihitung pada hari bernilai 0** (pembagian nol). Lihat
    `zero_ratio` untuk tahu seberapa banyak hari nol.
 4. **MAPE saja menyesatkan pada data ritel.** Hari dengan penjualan 1 buah
    membuat MAPE meledak walau selisihnya 1 buah. Karena itu WAPE juga
-   dilaporkan: total kesalahan dibagi total penjualan. Untuk data ini,
-   pakai WAPE sebagai angka utama dan MAPE sebagai pembanding.
+   dilaporkan: total kesalahan dibagi total penjualan.
 5. **Jangan menampilkan prediksi saat data tidak cukup.** Di bawah 28 hari
    pipeline mengembalikan status `insufficient_data`.
 6. **Jangan mengarang tanggal habis.** Kalau permintaan kumulatif belum
@@ -516,26 +399,31 @@ supaya SARIMA menang.
    tanggal itu. Data yang berakhir bertahun lalu tidak bisa dipakai untuk
    memprediksi stok hari ini.
 
+> **Catatan WAPE 100%.** Nilai ini muncul saat model memprediksi 0 sementara
+> aktualnya juga sangat kecil. Jangan menyimpulkan "model gagal" dari angka
+> ini tanpa melihat MAE dan volume permintaannya. Lihat bagian 5a dan 5c.
+
 ## 9. Batasan yang harus ditulis di laporan
 
-- Data yang dipakai sebagai contoh (`dataset_umkm_sembako.csv`) berakhir
-  2017-08-15, jadi semua ramalan berlaku untuk Agustus 2017 — bukan kondisi
-  sekarang.
-- Target akurasi ≤ 20% **tidak tercapai pada `dataset_umkm_sembako.csv`**:
-  WAPE median 47,3% dan MAPE median 48,0% pada horizon 7 hari (hanya 1 dari
-  44 produk di bawah WAPE 20%). Pada `store_item_demand.csv` hasilnya jauh
-  lebih baik (WAPE median 20,6% pada 7 hari, 13 dari 30 produk lolos), tetapi
-  tetap belum semua produk. Penyebab utamanya sifat data, bukan bug — dan itu
-  dibuktikan dengan angka, bukan diklaim.
-- Tidak ada satu pun dataset di folder ini yang merupakan transaksi UMKM
-  nyata. Semua angka adalah hasil pada data publik/simulasi. Validasi
-  sesungguhnya baru terjadi setelah data tokomu sendiri dijalankan.
-- Model belum mempertimbangkan hari libur, promo (`sedang_promo` tersedia di
-  data tetapi belum dipakai), atau tren musiman tahunan.
+- Data berakhir **2026-04-24**, jadi semua ramalan berlaku untuk periode
+  setelah tanggal itu — bukan kondisi hari ini. Pipeline memberi peringatan
+  otomatis bila data terakhir lebih dari 30 hari yang lalu.
+- Target akurasi ≤20% **tidak tercapai** pada dataset ini: WAPE median 100%
+  di level produk, 67,1% di level subkategori. Penyebab utamanya kepadatan
+  data (median 0,77 unit/hari, 56% hari nol), bukan bug — dan itu dibuktikan
+  dengan angka, bukan diklaim.
+- Pada unit bervolume tinggi (≥20 unit/hari), error turun ke kisaran
+  25–40%. Belum ada satu pun unit yang mencapai ≤20% di dataset ini.
+- **Belum ada agregasi resmi di pipeline.** Analisis subkategori di bagian
+  5c dilakukan di luar pipeline. Pipeline masih memproses per produk.
+- Kedua dataset **bukan transaksi UMKM nyata**. Validasi sesungguhnya baru
+  terjadi setelah data toko sendiri dijalankan.
+- Model belum mempertimbangkan `Sales Type` (Promo, Markdown, Clearance)
+  walaupun kolom itu tersedia dan 23.651 baris berstatus Promo. Efek promo
+  terhadap lonjakan permintaan belum ditangkap.
 - Belum ada hyperparameter tuning (grid search) untuk SARIMA.
-- Estimasi stok habis memakai stok awal & lead time manual, kecuali file
-  menyediakan kolom `stock_on_hand` / `lead_time_days`. Stok awal 20 unit
-  adalah contoh, bukan stok toko sebenarnya.
+- Lead time masih asumsi 3 hari untuk semua produk; file inventori tidak
+  menyediakan kolom lead time.
 
 ## 10. Langkah berikutnya
 
@@ -552,4 +440,16 @@ Rencananya file yang ditambahkan hanya `api/main.py` dan `api/schemas.py`
 yang **memanggil fungsi di `src/umkm_ml/pipeline.py`**, sehingga logika
 peramalan tetap satu sumber kebenaran dan tidak diduplikasi.
 
+### Kandidat perbaikan akurasi, berurutan menurut bukti
 
+1. **Agregasi ke level subkategori.** Bagian 5c menunjukkan ini menaikkan
+   akurasi paling banyak (100% → 67,1% median, dan 25–40% pada unit
+   bervolume tinggi). Ini juga lebih masuk akal untuk keputusan restock:
+   pemilik toko berpikir per jenis barang, bukan per SKU yang laku 0,7 buah
+   sehari.
+2. **Pakai kolom `Sales Type`.** 23.651 baris berstatus Promo. Lonjakan saat
+   promo saat ini dianggap noise padahal bisa dipelajari sebagai fitur.
+3. **Saring produk yang layak diramal.** Tolak produk dengan riwayat terlalu
+   jarang, dan tampilkan status "data belum cukup berpola" alih-alih angka
+   0 yang menyesatkan.
+4. **Hyperparameter tuning SARIMA** setelah tiga langkah di atas.

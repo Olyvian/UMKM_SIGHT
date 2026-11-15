@@ -119,7 +119,15 @@ def build_daily_series(
 
     # Retur / pembatalan: kuantitas negatif. Untuk permintaan (demand) kita
     # hanya peduli barang yang benar-benar keluar, jadi baris ini dibuang.
+    #
+    # Sebagian file (mis. retail_sales_ml_apl.csv) menyimpan penanda retur
+    # di kolom terpisah `Is Return` (1 = retur) sementara kuantitasnya tetap
+    # ditulis negatif. Kedua penanda digabung dengan OR, bukan dijumlahkan,
+    # supaya satu baris retur tidak terhitung dua kali.
     returns_mask = rows["quantity"] < 0
+    if "is_return" in rows.columns:
+        flag = pd.to_numeric(rows["is_return"], errors="coerce")
+        returns_mask = returns_mask | (flag.fillna(0) > 0)
     dropped_returns = int(returns_mask.sum())
     rows = rows.loc[~returns_mask]
 
