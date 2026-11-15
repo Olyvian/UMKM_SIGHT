@@ -15,6 +15,7 @@ import 'core/config/supabase_config.dart';
 import 'core/storage/session_storage.dart';
 import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/dashboard/data/repositories/dashboard_repository.dart';
 import 'features/products/data/repositories/product_repository.dart';
 
 /// Inisialisasi bersama untuk semua entry point.
@@ -54,16 +55,22 @@ Future<void> bootstrap({bool resetSession = false}) async {
   final productRepository = ProductRepository(
     client: Supabase.instance.client,
   );
+  final dashboardRepository = DashboardRepository(
+    client: Supabase.instance.client,
+  );
 
   runApp(
     RepositoryProvider.value(
-      value: productRepository,
+      value: dashboardRepository,
       child: RepositoryProvider.value(
-        value: authRepository,
-        child: BlocProvider(
-          create: (_) => AuthBloc(authRepository: authRepository)
-            ..add(const AuthSessionChecked()),
-          child: UmkmSightApp(startAtPasswordReset: startAtPasswordReset),
+        value: productRepository,
+        child: RepositoryProvider.value(
+          value: authRepository,
+          child: BlocProvider(
+            create: (_) => AuthBloc(authRepository: authRepository)
+              ..add(const AuthSessionChecked()),
+            child: UmkmSightApp(startAtPasswordReset: startAtPasswordReset),
+          ),
         ),
       ),
     ),
