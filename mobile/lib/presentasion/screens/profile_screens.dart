@@ -28,14 +28,13 @@ class ProfileScreens extends StatefulWidget {
 }
 
 class _ProfileScreensState extends State<ProfileScreens> {
-  // Data contoh (ganti dengan data dari API / penyimpanan lokal nanti)
-  String _name = 'Budi Santoso';
-  String _email = 'budi@tokoberkah.com';
-  final String _role = 'Owner';
+  String _name = 'Pemilik Toko';
+  String _email = '';
+  String _role = 'Owner';
 
-  String _storeName = 'Toko Berkah Jaya';
-  String _category = 'Sembako & Kebutuhan Harian';
-  String _address = 'Pasar Cipinang Blok B No. 12, Jakarta Timur';
+  String _storeName = 'Toko Saya';
+  String _category = 'Belum diisi';
+  String _address = 'Belum diisi';
 
   bool _lowStockAlert = true;
   bool _outOfStockAlert = true;
@@ -43,6 +42,22 @@ class _ProfileScreensState extends State<ProfileScreens> {
   int _thresholdDays = 3; // kirim peringatan saat estimasi habis <= N hari
 
   String _passwordInfo = 'Terakhir diperbarui 30 hari lalu';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = context.read<AuthBloc>().state.user;
+    if (user == null) return;
+    _name = user.name;
+    _email = user.email;
+    _role = user.role == 'OWNER' ? 'Owner' : user.role;
+    final store = user.store;
+    if (store != null) {
+      _storeName = store.storeName;
+      final address = store.address;
+      if (address != null && address.trim().isNotEmpty) _address = address;
+    }
+  }
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context)
@@ -119,7 +134,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
     _toast('Kata sandi berhasil diubah');
   }
 
-    Future<void> _logout() async {
+  Future<void> _logout() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -174,8 +189,8 @@ class _ProfileScreensState extends State<ProfileScreens> {
                       onAction: _editStore),
                   const SizedBox(height: 12),
                   SoftCard(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                     child: Column(
                       children: [
                         _InfoTile(
@@ -199,13 +214,14 @@ class _ProfileScreensState extends State<ProfileScreens> {
                   const _SectionHeader(title: 'Preferensi Notifikasi'),
                   const SizedBox(height: 12),
                   SoftCard(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                     child: Column(
                       children: [
                         _SwitchTile(
                           title: 'Peringatan stok menipis',
-                          subtitle: 'Notifikasi saat stok mendekati batas minimum',
+                          subtitle:
+                              'Notifikasi saat stok mendekati batas minimum',
                           value: _lowStockAlert,
                           onChanged: (v) => setState(() => _lowStockAlert = v),
                         ),
@@ -244,8 +260,8 @@ class _ProfileScreensState extends State<ProfileScreens> {
                   const _SectionHeader(title: 'Keamanan Akun'),
                   const SizedBox(height: 12),
                   SoftCard(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                     child: _NavTile(
                       icon: Icons.lock_outline_rounded,
                       title: 'Ubah Kata Sandi',
@@ -257,8 +273,8 @@ class _ProfileScreensState extends State<ProfileScreens> {
                   const _SectionHeader(title: 'Lainnya'),
                   const SizedBox(height: 12),
                   SoftCard(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                     child: Column(
                       children: [
                         _NavTile(
@@ -453,9 +469,11 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 Expanded(child: _MiniStat(value: '48', label: 'Item aktif')),
                 _VLine(),
-                Expanded(child: _MiniStat(value: '126', label: 'Transaksi/bulan')),
+                Expanded(
+                    child: _MiniStat(value: '126', label: 'Transaksi/bulan')),
                 _VLine(),
-                Expanded(child: _MiniStat(value: 'Jan 2025', label: 'Bergabung')),
+                Expanded(
+                    child: _MiniStat(value: 'Jan 2025', label: 'Bergabung')),
               ],
             ),
           ),
@@ -485,8 +503,7 @@ class _MiniStat extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(label,
-              style:
-                  const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
         ),
       ],
     );
@@ -682,9 +699,7 @@ class _SwitchTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(subtitle,
                     style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.3,
-                        color: AppColors.textMuted)),
+                        fontSize: 13, height: 1.3, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -698,8 +713,7 @@ class _SwitchTile extends StatelessWidget {
                   ? AppColors.primary
                   : _kSwitchOff,
             ),
-            trackOutlineColor:
-                const WidgetStatePropertyAll(Colors.transparent),
+            trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
           ),
         ],
       ),
@@ -740,9 +754,8 @@ class _ThresholdPicker extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 18, vertical: 9),
                       decoration: BoxDecoration(
-                        color: d == value
-                            ? AppColors.primary
-                            : AppColors.surface,
+                        color:
+                            d == value ? AppColors.primary : AppColors.surface,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text('$d hari',
@@ -848,7 +861,8 @@ class _FormSheetState extends State<_FormSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -895,8 +909,8 @@ class _FormSheetState extends State<_FormSheet> {
                   onChanged: (_) {
                     if (_error != null) setState(() => _error = null);
                   },
-                  style: const TextStyle(
-                      fontSize: 16, color: AppColors.textDark),
+                  style:
+                      const TextStyle(fontSize: 16, color: AppColors.textDark),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: AppColors.chip,
@@ -919,8 +933,8 @@ class _FormSheetState extends State<_FormSheet> {
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: _kRedBg,
                     borderRadius: BorderRadius.circular(12),

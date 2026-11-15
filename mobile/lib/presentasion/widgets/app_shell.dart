@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../screens/analytics_screens.dart';
 import '../screens/home_screens.dart';
 import '../screens/product_screens.dart';
@@ -61,6 +63,12 @@ class AppTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final storeName =
+        context.select((AuthBloc bloc) => bloc.state.user?.store?.storeName);
+    final title = (storeName == null || storeName.trim().isEmpty)
+        ? 'Toko Saya'
+        : storeName;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: const BoxDecoration(
@@ -88,11 +96,11 @@ class AppTopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'TOKO UMKM',
                   style: TextStyle(
                     fontSize: 12,
@@ -101,12 +109,12 @@ class AppTopBar extends StatelessWidget {
                     color: AppColors.textMuted,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Toko Berkah Jaya',
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textDark,

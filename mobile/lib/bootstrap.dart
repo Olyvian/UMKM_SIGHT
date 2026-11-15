@@ -1,8 +1,13 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, SignOutScope;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show Supabase, SignOutScope;
 
 import 'app.dart';
 import 'core/config/missing_config_app.dart';
@@ -26,8 +31,10 @@ Future<void> bootstrap({bool resetSession = false}) async {
 
   await Supabase.initialize(
     url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
+    publishableKey: SupabaseConfig.anonKey,
   );
+
+  final startAtPasswordReset = await _recoverPasswordResetLink();
 
   final prefs = await SharedPreferences.getInstance();
   final sessionStorage = SessionStorage(prefs);
@@ -50,8 +57,43 @@ Future<void> bootstrap({bool resetSession = false}) async {
       child: BlocProvider(
         create: (_) => AuthBloc(authRepository: authRepository)
           ..add(const AuthSessionChecked()),
-        child: const UmkmSightApp(),
+        child: UmkmSightApp(startAtPasswordReset: startAtPasswordReset),
       ),
     ),
   );
+}
+
+/// Mendeteksi tautan reset kata sandi pada peluncuran aplikasi (cold start)
+/// dan menunggu sesi pemulihan siap sebelum UI dibuka.
+Future<bool> _recoverPasswordResetLink() async {
+  if (kIsWeb) return false;
+
+  final Uri? link;
+  try {
+    link = await AppLinks().getInitialLink();
+  } catch (_) {
+    return false;
+  }
+  if (link == null || !_isPasswordRecoveryLink(link)) return false;
+
+  final auth = Supabase.instance.client.auth;
+  if (auth.currentSession == null) {
+    try {
+      await auth.onAuthStateChange
+          .firstWhere((state) => state.session != null)
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // Tautan kedaluwarsa/terpakai: halaman reset menampilkan pesannya.
+    }
+  }
+  return true;
+}
+
+bool _isPasswordRecoveryLink(Uri uri) {
+  final fragment = Uri.splitQueryString(uri.fragment);
+  String? param(String key) => uri.queryParameters[key] ?? fragment[key];
+
+  final type = param('type');
+  if (type != null) return type == 'recovery';
+  return param('code') != null || param('access_token') != null;
 }

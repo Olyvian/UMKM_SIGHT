@@ -43,14 +43,6 @@ class _LoginPageState extends State<LoginPage> {
         );
   }
 
-  void _showForgotPasswordInfo() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Pemulihan kata sandi segera hadir.')),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -117,8 +109,15 @@ class _LoginPageState extends State<LoginPage> {
                 validator: Validators.loginPassword,
                 onFieldSubmitted: (_) => _submit(),
                 enabled: !isSubmitting,
-                trailingLabel: GestureDetector(
-                  onTap: _showForgotPasswordInfo,
+                trailingLabel: TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => context.go(AppRoutes.forgotPassword),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(48, 32),
+                    visualDensity: VisualDensity.compact,
+                  ),
                   child: Text(
                     'Lupa kata sandi?',
                     style: textTheme.bodyMedium?.copyWith(

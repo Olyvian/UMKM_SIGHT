@@ -183,20 +183,16 @@ class _ProductScreensState extends State<ProductScreens> {
 // ---------- Kartu dasar (bayangan lembut + efek tap) ----------
 class _SoftCard extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
-  final double radius;
   final VoidCallback? onTap;
 
   const _SoftCard({
     required this.child,
-    this.padding = const EdgeInsets.all(14),
-    this.radius = 24,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final r = BorderRadius.circular(radius);
+    final r = BorderRadius.circular(24);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -215,85 +211,8 @@ class _SoftCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(padding: padding, child: child),
+          child: Padding(padding: const EdgeInsets.all(14), child: child),
         ),
-      ),
-    );
-  }
-}
-
-// ---------- Top bar ----------
-class _TopBar extends StatelessWidget {
-  const _TopBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FB),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TOKO UMKM',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Toko Berkah Jaya',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.textMuted,
-            size: 28,
-          ),
-          const SizedBox(width: 18),
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary,
-            child: Icon(Icons.person_outline_rounded, color: Colors.white),
-          ),
-        ],
       ),
     );
   }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/stock_in_sheet.dart';
 import 'analytics_screens.dart';
-
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRestock = Color(0xFF9A3412);
@@ -20,7 +21,6 @@ class _StockItem {
   final Color badgeBg, badgeFg;
   final Color? stockColor;
   final IconData etaIcon;
-  final String? imagePath; // contoh: 'assets/images/minyak.png'
 
   const _StockItem({
     required this.name,
@@ -31,7 +31,6 @@ class _StockItem {
     this.stockColor,
     required this.eta,
     required this.etaIcon,
-    this.imagePath,
   });
 }
 
@@ -60,7 +59,6 @@ const _attention = <_StockItem>[
     stockColor: _kRedText,
     eta: 'Habis: Hari ini',
     etaIcon: Icons.event_busy_outlined,
-    // imagePath: 'assets/images/minyak.png',
   ),
   _StockItem(
     name: 'Beras Premium 5 kg',
@@ -70,7 +68,6 @@ const _attention = <_StockItem>[
     stockValue: '4 karung',
     eta: 'Habis: dlm 2 hari (6 Apr)',
     etaIcon: Icons.schedule,
-    // imagePath: 'assets/images/beras.png',
   ),
   _StockItem(
     name: 'Gula Pasir 1 kg',
@@ -80,7 +77,6 @@ const _attention = <_StockItem>[
     stockValue: '9 kg',
     eta: 'Habis: dlm 5 hari (9 Apr)',
     etaIcon: Icons.trending_down,
-    // imagePath: 'assets/images/gula.png',
   ),
 ];
 
@@ -170,19 +166,17 @@ class _HomeScreensState extends State<HomeScreens> {
 class _SoftCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final double radius;
   final VoidCallback? onTap;
 
   const _SoftCard({
     required this.child,
     this.padding = const EdgeInsets.all(14),
-    this.radius = 24,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final r = BorderRadius.circular(radius);
+    final r = BorderRadius.circular(24);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -208,107 +202,34 @@ class _SoftCard extends StatelessWidget {
   }
 }
 
-// ---------- Top bar ----------
-class _TopBar extends StatelessWidget {
-  const _TopBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FB),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TOKO UMKM',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Toko Berkah Jaya',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.textMuted,
-            size: 28,
-          ),
-          const SizedBox(width: 18),
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary,
-            child: Icon(Icons.person_outline_rounded, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ---------- Greeting ----------
 class _Greeting extends StatelessWidget {
   const _Greeting();
 
   @override
   Widget build(BuildContext context) {
+    final name = context.select((AuthBloc bloc) => bloc.state.user?.name);
+    final greeting =
+        (name == null || name.trim().isEmpty) ? 'Pemilik Toko' : name;
+
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Halo, Toko Berkah Jaya',
+                'Halo, $greeting',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textDark,
                 ),
               ),
-              SizedBox(height: 4),
-              Text(
+              const SizedBox(height: 4),
+              const Text(
                 'Pantauan stok dan prediksi pergerakan hari ini',
                 style: TextStyle(
                   fontSize: 14,
@@ -328,14 +249,15 @@ class _Greeting extends StatelessWidget {
             onTap: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const AnalyticsScreens()),
-              ),
+            ),
             child: const SizedBox(
               width: 52,
               height: 52,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Icon(Icons.bar_chart_rounded, color: AppColors.primary, size: 28)
+                  Icon(Icons.bar_chart_rounded,
+                      color: AppColors.primary, size: 28)
                 ],
               ),
             ),
@@ -451,7 +373,9 @@ class _ActionButtons extends StatelessWidget {
               context,
               products: const [
                 StockInProduct(
-                    name: 'Minyak Goreng Sania 2L', unit: 'botol', suggested: 24),
+                    name: 'Minyak Goreng Sania 2L',
+                    unit: 'botol',
+                    suggested: 24),
                 StockInProduct(
                     name: 'Beras Premium 5 kg', unit: 'karung', suggested: 15),
                 StockInProduct(
@@ -553,13 +477,6 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final placeholder = Container(
-      width: 56,
-      height: 56,
-      color: AppColors.chip,
-      child: const Icon(Icons.shopping_bag_outlined, color: AppColors.hint),
-    );
-
     return _SoftCard(
       onTap: () {},
       child: Row(
@@ -569,15 +486,15 @@ class _ProductCard extends StatelessWidget {
             padding: const EdgeInsets.only(top: 2),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: item.imagePath == null
-                  ? placeholder
-                  : Image.asset(
-                      item.imagePath!,
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => placeholder,
-                    ),
+              child: Container(
+                width: 56,
+                height: 56,
+                color: AppColors.chip,
+                child: const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: AppColors.hint,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 16),
