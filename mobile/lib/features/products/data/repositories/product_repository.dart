@@ -226,6 +226,36 @@ class ProductRepository {
     }
   }
 
+  /// Mencatat satu penjualan lewat RPC `record_sale` (atomik: stok
+  /// dikurangi, transaksi, item, dan mutasi stok dibuat dalam satu
+  /// transaksi database).
+  ///
+  /// [transactionDate] opsional; bila diisi, transaksi dicatat pada waktu
+  /// tersebut (bukan `now()`). Fitur ini memerlukan
+  /// `supabase/migration_record_sale_date.sql` sudah dijalankan.
+  Future<void> recordSale({
+    required String productId,
+    required int quantity,
+    String? note,
+    DateTime? transactionDate,
+  }) async {
+    try {
+      await _client.rpc(
+        'record_sale',
+        params: {
+          'p_items': [
+            {'product_id': productId, 'quantity': quantity},
+          ],
+          'p_note': note,
+          if (transactionDate != null)
+            'p_transaction_date': transactionDate.toUtc().toIso8601String(),
+        },
+      );
+    } on PostgrestException catch (error) {
+      throw _saleFailure(error);
+    }
+  }
+
   Future<void> recordStockIn({
     required String productId,
     required int quantity,
@@ -264,6 +294,47 @@ class ProductRepository {
     }
   }
 
+  ProductFailure _saleFailure(PostgrestException error) {
+    final message = error.message;
+
+    if (message.contains('INSUFFICIENT_STOCK')) {
+      return ProductFailure(
+        error.details == null
+            ? 'Stok tidak mencukupi untuk penjualan ini.'
+            : 'Stok tidak mencukupi (${error.details}).',
+      );
+    }
+    if (message.contains('PRODUCT_NOT_FOUND')) {
+      return const ProductFailure(
+        'Produk tidak ditemukan atau sudah diarsipkan.',
+      );
+    }
+    if (message.contains('INVALID_QUANTITY')) {
+      return const ProductFailure('Jumlah penjualan harus lebih dari 0.');
+    }
+    if (message.contains('EMPTY_ITEMS')) {
+      return const ProductFailure('Tidak ada produk yang dipilih.');
+    }
+    if (message.contains('INVALID_DATE')) {
+      return const ProductFailure(
+        'Tanggal transaksi tidak boleh melewati waktu sekarang.',
+      );
+    }
+    if (message.contains('NO_STORE')) {
+      return const ProductFailure(
+        'Akun ini belum memiliki toko. Hubungi admin atau daftar ulang.',
+      );
+    }
+    // RPC versi lama belum menerima p_transaction_date.
+    if (error.code == 'PGRST202') {
+      return const ProductFailure(
+        'Fungsi record_sale belum diperbarui. Jalankan '
+        'supabase/migration_record_sale_date.sql di Supabase SQL Editor.',
+      );
+    }
+    return _failure(error, 'Gagal mencatat penjualan.');
+  }
+
   ProductFailure _failure(PostgrestException error, String fallback) {
     if (error.code == '23505') {
       return const ProductFailure(
@@ -277,8 +348,8 @@ class ProductRepository {
     }
     if (const {'42P01', '42883', 'PGRST202', 'PGRST205'}.contains(error.code)) {
       return const ProductFailure(
-        'Skema inventaris belum tersedia. Jalankan schema.sql lalu '
-        'schema_Inventoris.sql di Supabase SQL Editor.',
+        'Skema inventaris belum tersedia. Jalankan schema.sql di Supabase '
+        'SQL Editor.',
       );
     }
     return ProductFailure('$fallback ${error.message}');

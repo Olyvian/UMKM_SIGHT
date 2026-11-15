@@ -5,11 +5,15 @@ import '../../core/theme/app_colors.dart';
 
 class SaleEntryProduct {
   const SaleEntryProduct({
+    this.id,
     required this.name,
     required this.unit,
     required this.availableStock,
   });
 
+  /// Id produk di tabel `products`. Wajib diisi bila hasil form akan
+  /// disimpan ke Supabase.
+  final String? id;
   final String name;
   final String unit;
   final int availableStock;

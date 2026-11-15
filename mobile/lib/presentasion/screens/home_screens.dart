@@ -3,9 +3,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/dashboard/data/models/home_data.dart';
+import '../../features/dashboard/data/repositories/dashboard_repository.dart';
+import '../../features/products/data/models/product_overview.dart';
+import '../../features/products/data/repositories/product_repository.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/sale_entry_sheet.dart';
 import '../widgets/stock_in_sheet.dart';
 import 'analytics_screens.dart';
+import 'product_screens.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRestock = Color(0xFF9A3412);
@@ -15,88 +21,19 @@ const _kOrangeBg = Color(0xFFFFE0CC);
 const _kInfoBar = Color(0xFFEFF2FB);
 const _kGreyText = Color(0xFF334155);
 
-// ---------- Model data sederhana (ganti dengan data API nanti) ----------
-class _StockItem {
-  final String name, badge, stockValue, eta;
-  final Color badgeBg, badgeFg;
-  final Color? stockColor;
-  final IconData etaIcon;
-
-  const _StockItem({
-    required this.name,
-    required this.badge,
-    required this.badgeBg,
-    required this.badgeFg,
-    required this.stockValue,
-    this.stockColor,
-    required this.eta,
-    required this.etaIcon,
-  });
-}
-
-class _ActivityItem {
-  final IconData icon;
-  final String title, time, badge;
-  final Color badgeBg, badgeFg;
-
-  const _ActivityItem({
-    required this.icon,
-    required this.title,
-    required this.time,
-    required this.badge,
-    required this.badgeBg,
-    required this.badgeFg,
-  });
-}
-
-const _attention = <_StockItem>[
-  _StockItem(
-    name: 'Minyak Goreng Sania 2L',
-    badge: 'Stok habis',
-    badgeBg: _kRedBg,
-    badgeFg: _kRedText,
-    stockValue: '0 botol',
-    stockColor: _kRedText,
-    eta: 'Habis: Hari ini',
-    etaIcon: Icons.event_busy_outlined,
-  ),
-  _StockItem(
-    name: 'Beras Premium 5 kg',
-    badge: 'Segera restock',
-    badgeBg: _kOrangeBg,
-    badgeFg: _kRestock,
-    stockValue: '4 karung',
-    eta: 'Habis: dlm 2 hari (6 Apr)',
-    etaIcon: Icons.schedule,
-  ),
-  _StockItem(
-    name: 'Gula Pasir 1 kg',
-    badge: 'Perlu dipantau',
-    badgeBg: AppColors.chip,
-    badgeFg: _kGreyText,
-    stockValue: '9 kg',
-    eta: 'Habis: dlm 5 hari (9 Apr)',
-    etaIcon: Icons.trending_down,
-  ),
-];
-
-const _activities = <_ActivityItem>[
-  _ActivityItem(
-    icon: Icons.point_of_sale,
-    title: 'Penjualan: 3 botol Minyak Goreng',
-    time: 'Hari ini, 09:30 WIB',
-    badge: 'Sisa: 0 botol',
-    badgeBg: _kRedBg,
-    badgeFg: _kRedText,
-  ),
-  _ActivityItem(
-    icon: Icons.move_to_inbox_outlined,
-    title: 'Stok Masuk: 20 kg Gula Pasir',
-    time: 'Kemarin, 14:15 WIB',
-    badge: 'Sisa: 29 kg',
-    badgeBg: AppColors.chip,
-    badgeFg: AppColors.textDark,
-  ),
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
 // =====================================================================
@@ -108,6 +45,52 @@ class HomeScreens extends StatefulWidget {
 }
 
 class _HomeScreensState extends State<HomeScreens> {
+  late final DashboardRepository _repository;
+  late Future<HomeData> _homeFuture;
+
+  /// Data terakhir yang berhasil dimuat. Dipakai sebagai `initialData`
+  /// supaya saat menyegarkan, isi beranda tetap tampil (tidak berkedip
+  /// menjadi spinner) sampai data baru tiba.
+  HomeData? _lastData;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = context.read<DashboardRepository>();
+    _homeFuture = _load();
+  }
+
+  Future<HomeData> _load() async {
+    final data = await _repository.fetchHome();
+    _lastData = data;
+    return data;
+  }
+
+  void _reload() {
+    setState(() {
+      _homeFuture = _load();
+    });
+  }
+
+  /// Dipakai RefreshIndicator: menunggu permintaan selesai agar indikator
+  /// berhenti tepat saat data baru tampil.
+  Future<void> _refresh() async {
+    final future = _load();
+    setState(() => _homeFuture = future);
+    try {
+      await future;
+    } catch (_) {
+      // Pesan galat ditampilkan oleh FutureBuilder.
+    }
+  }
+
+  void _openProducts() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const ProductScreens()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,40 +101,76 @@ class _HomeScreensState extends State<HomeScreens> {
           children: [
             const AppTopBar(),
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                children: [
-                  const _Greeting(),
-                  const SizedBox(height: 22),
-                  const _StatRow(),
-                  const SizedBox(height: 22),
-                  const _ActionButtons(),
-                  const SizedBox(height: 32),
-                  _SectionHeader(
-                    title: 'Perlu Perhatian',
-                    subtitle: 'Prioritas restock berdasarkan perkiraan habis',
-                    action: 'Lihat Semua',
-                    onAction: () {},
-                  ),
-                  const SizedBox(height: 16),
-                  for (final item in _attention)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _ProductCard(item: item),
+              child: FutureBuilder<HomeData>(
+                future: _homeFuture,
+                initialData: _lastData,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return _LoadError(
+                      message: snapshot.error.toString(),
+                      onRetry: _reload,
+                    );
+                  }
+
+                  final data = snapshot.data!;
+                  return RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                      children: [
+                        const _Greeting(),
+                        const SizedBox(height: 22),
+                        _StatRow(summary: data.summary),
+                        const SizedBox(height: 22),
+                        _ActionButtons(onDataChanged: _reload),
+                        const SizedBox(height: 32),
+                        _SectionHeader(
+                          title: 'Perlu Perhatian',
+                          subtitle:
+                              'Prioritas restock berdasarkan perkiraan habis',
+                          action: 'Lihat Semua',
+                          onAction: _openProducts,
+                        ),
+                        const SizedBox(height: 16),
+                        if (data.attention.isEmpty)
+                          const _EmptyHint(
+                            icon: Icons.check_circle_outline,
+                            message: 'Semua stok dalam kondisi aman.',
+                          )
+                        else
+                          for (final product in data.attention)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _ProductCard(product: product),
+                            ),
+                        const SizedBox(height: 16),
+                        const _SectionHeader(
+                          title: 'Aktivitas Terbaru',
+                          action: 'Terakhir disinkronkan',
+                        ),
+                        const SizedBox(height: 16),
+                        if (data.activities.isEmpty)
+                          const _EmptyHint(
+                            icon: Icons.history,
+                            message: 'Belum ada aktivitas stok.',
+                          )
+                        else
+                          for (final activity in data.activities)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _ActivityCard(activity: activity),
+                            ),
+                      ],
                     ),
-                  const SizedBox(height: 16),
-                  const _SectionHeader(
-                    title: 'Aktivitas Terbaru',
-                    action: 'Terakhir disinkronkan',
-                  ),
-                  const SizedBox(height: 16),
-                  for (final item in _activities)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _ActivityCard(item: item),
-                    ),
-                ],
+                  );
+                },
               ),
             ),
           ],
@@ -270,30 +289,36 @@ class _Greeting extends StatelessWidget {
 
 // ---------- Kartu statistik ----------
 class _StatRow extends StatelessWidget {
-  const _StatRow();
+  const _StatRow({required this.summary});
+
+  final HomeSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         Expanded(
           child: _StatCard(
-            value: '48',
+            value: '${summary.activeItems}',
             label: 'Item aktif',
             color: AppColors.textDark,
           ),
         ),
-        SizedBox(width: 14),
+        const SizedBox(width: 14),
         Expanded(
           child: _StatCard(
-            value: '3',
+            value: '${summary.needRestock}',
             label: 'Perlu restock',
             color: _kRestock,
           ),
         ),
-        SizedBox(width: 14),
+        const SizedBox(width: 14),
         Expanded(
-          child: _StatCard(value: '1', label: 'Stok habis', color: _kRedText),
+          child: _StatCard(
+            value: '${summary.outOfStock}',
+            label: 'Stok habis',
+            color: _kRedText,
+          ),
         ),
       ],
     );
@@ -339,8 +364,165 @@ class _StatCard extends StatelessWidget {
 }
 
 // ---------- Tombol aksi ----------
-class _ActionButtons extends StatelessWidget {
-  const _ActionButtons();
+class _ActionButtons extends StatefulWidget {
+  const _ActionButtons({required this.onDataChanged});
+
+  /// Dipanggil setelah penjualan/stok masuk tersimpan agar angka ringkasan
+  /// dan daftar aktivitas ikut diperbarui.
+  final VoidCallback onDataChanged;
+
+  @override
+  State<_ActionButtons> createState() => _ActionButtonsState();
+}
+
+class _ActionButtonsState extends State<_ActionButtons> {
+  bool _busy = false;
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? _kRedText : null,
+        ),
+      );
+  }
+
+  String _errorText(Object error, String fallback) {
+    if (error is ProductFailure) return error.message;
+    return '$fallback $error';
+  }
+
+  /// Memuat produk aktif terbaru dari Supabase.
+  Future<List<ProductOverview>> _loadActiveProducts(
+    ProductRepository repository,
+  ) async {
+    final products = await repository.fetchProducts();
+    return products.where((product) => product.isActive).toList();
+  }
+
+  Future<void> _recordSale() async {
+    if (_busy) return;
+    final repository = context.read<ProductRepository>();
+    setState(() => _busy = true);
+    try {
+      final products = (await _loadActiveProducts(repository))
+          .where((product) => product.currentStock > 0)
+          .toList();
+      if (!mounted) return;
+      if (products.isEmpty) {
+        _showMessage(
+          'Belum ada produk aktif yang stoknya tersedia.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await showSaleEntrySheet(
+        context,
+        products: [
+          for (final product in products)
+            SaleEntryProduct(
+              id: product.id,
+              name: product.name,
+              unit: product.unit,
+              availableStock: product.currentStock,
+            ),
+        ],
+      );
+      if (result == null || !mounted) return;
+
+      final productId = result.product.id;
+      if (productId == null) {
+        _showMessage(
+          'Produk tidak dikenali. Muat ulang beranda.',
+          isError: true,
+        );
+        return;
+      }
+
+      await repository.recordSale(
+        productId: productId,
+        quantity: result.quantity,
+        transactionDate: result.dateTime,
+      );
+      if (!mounted) return;
+
+      _showMessage(
+        'Penjualan ${result.quantity} ${result.product.unit} '
+        '${result.product.name} tersimpan.',
+      );
+      widget.onDataChanged();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        _errorText(error, 'Gagal mencatat penjualan:'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _recordStockIn() async {
+    if (_busy) return;
+    final repository = context.read<ProductRepository>();
+    setState(() => _busy = true);
+    try {
+      final products = await _loadActiveProducts(repository);
+      if (!mounted) return;
+      if (products.isEmpty) {
+        _showMessage(
+          'Belum ada produk aktif. Tambahkan produk lebih dulu.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await showStockInSheet(
+        context,
+        products: [
+          for (final product in products)
+            StockInProduct(
+              id: product.id,
+              name: product.name,
+              unit: product.unit,
+            ),
+        ],
+      );
+      if (result == null || !mounted) return;
+
+      final productId = result.product.id;
+      if (productId == null) {
+        _showMessage(
+          'Produk tidak dikenali. Muat ulang beranda.',
+          isError: true,
+        );
+        return;
+      }
+
+      await repository.recordStockIn(
+        productId: productId,
+        quantity: result.quantity,
+      );
+      if (!mounted) return;
+
+      _showMessage(
+        'Stok masuk ${result.quantity} ${result.product.unit} '
+        '${result.product.name} tersimpan.',
+      );
+      widget.onDataChanged();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        _errorText(error, 'Gagal mencatat stok masuk:'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -353,12 +535,14 @@ class _ActionButtons extends StatelessWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            onPressed: () {},
+            onPressed: _busy ? null : _recordSale,
             icon: const Icon(Icons.edit_note_rounded, size: 24),
             label: const FittedBox(child: Text('Catat Penjualan')),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.chip,
               foregroundColor: AppColors.textDark,
+              disabledBackgroundColor: AppColors.chip,
+              disabledForegroundColor: AppColors.hint,
               minimumSize: const Size.fromHeight(60),
               textStyle: textStyle,
               shape: shape,
@@ -369,24 +553,14 @@ class _ActionButtons extends StatelessWidget {
         const SizedBox(width: 14),
         Expanded(
           child: FilledButton.icon(
-            onPressed: () => showStockInSheet(
-              context,
-              products: const [
-                StockInProduct(
-                    name: 'Minyak Goreng Sania 2L',
-                    unit: 'botol',
-                    suggested: 24),
-                StockInProduct(
-                    name: 'Beras Premium 5 kg', unit: 'karung', suggested: 15),
-                StockInProduct(
-                    name: 'Gula Pasir 1 kg', unit: 'kg', suggested: 25),
-              ],
-            ),
+            onPressed: _busy ? null : _recordStockIn,
             icon: const Icon(Icons.add_box_outlined, size: 24),
             label: const FittedBox(child: Text('+ Stok Masuk')),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.chip,
+              disabledForegroundColor: AppColors.hint,
               minimumSize: const Size.fromHeight(60),
               textStyle: textStyle,
               shape: shape,
@@ -472,13 +646,21 @@ class _SectionHeader extends StatelessWidget {
 
 // ---------- Kartu produk ----------
 class _ProductCard extends StatelessWidget {
-  final _StockItem item;
-  const _ProductCard({required this.item});
+  final ProductOverview product;
+  const _ProductCard({required this.product});
 
   @override
   Widget build(BuildContext context) {
+    final style = _statusStyle(product.status);
+    final stockColor = product.currentStock == 0
+        ? _kRedText
+        : (product.status == ProductStockStatus.restock ? _kRestock : null);
+
     return _SoftCard(
-      onTap: () {},
+      onTap: () => Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ProductScreens()),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -505,7 +687,7 @@ class _ProductCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        item.name,
+                        product.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -516,7 +698,7 @@ class _ProductCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _Pill(text: item.badge, bg: item.badgeBg, fg: item.badgeFg),
+                    _Pill(text: style.label, bg: style.bg, fg: style.fg),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -541,10 +723,11 @@ class _ProductCard extends StatelessWidget {
                           children: [
                             const TextSpan(text: 'Sisa: '),
                             TextSpan(
-                              text: item.stockValue,
+                              text:
+                                  '${product.currentStock} ${product.unit}',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: item.stockColor ?? AppColors.textDark,
+                                color: stockColor ?? AppColors.textDark,
                               ),
                             ),
                           ],
@@ -556,14 +739,14 @@ class _ProductCard extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              item.etaIcon,
+                              _etaIcon(product),
                               size: 18,
                               color: AppColors.textMuted,
                             ),
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                item.eta,
+                                _etaText(product),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -589,11 +772,13 @@ class _ProductCard extends StatelessWidget {
 
 // ---------- Kartu aktivitas ----------
 class _ActivityCard extends StatelessWidget {
-  final _ActivityItem item;
-  const _ActivityCard({required this.item});
+  final StockActivity activity;
+  const _ActivityCard({required this.activity});
 
   @override
   Widget build(BuildContext context) {
+    final isOutOfStock = activity.stockAfter == 0;
+
     return _SoftCard(
       child: Row(
         children: [
@@ -604,7 +789,8 @@ class _ActivityCard extends StatelessWidget {
               color: AppColors.chip,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(item.icon, color: AppColors.textDark),
+            child: Icon(_activityIcon(activity.movementType),
+                color: AppColors.textDark),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -612,7 +798,8 @@ class _ActivityCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.title,
+                  '${activity.label}: ${activity.quantity} ${activity.unit} '
+                  '${activity.productName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -623,7 +810,7 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.time,
+                  _formatActivityTime(activity.createdAt),
                   style: const TextStyle(
                     fontSize: 15,
                     color: AppColors.textMuted,
@@ -634,9 +821,9 @@ class _ActivityCard extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _Pill(
-            text: item.badge,
-            bg: item.badgeBg,
-            fg: item.badgeFg,
+            text: 'Sisa: ${activity.stockAfter} ${activity.unit}',
+            bg: isOutOfStock ? _kRedBg : AppColors.chip,
+            fg: isOutOfStock ? _kRedText : AppColors.textDark,
             bold: true,
           ),
         ],
@@ -675,4 +862,131 @@ class _Pill extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------- Kondisi kosong & galat ----------
+class _EmptyHint extends StatelessWidget {
+  const _EmptyHint({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: AppColors.hint),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, color: _kRedText, size: 40),
+            const SizedBox(height: 12),
+            const Text(
+              'Beranda belum dapat dimuat',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Coba lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- Pemetaan status & prediksi ke tampilan ----------
+class _StatusStyle {
+  const _StatusStyle(this.label, this.bg, this.fg);
+
+  final String label;
+  final Color bg;
+  final Color fg;
+}
+
+_StatusStyle _statusStyle(ProductStockStatus status) {
+  switch (status) {
+    case ProductStockStatus.outOfStock:
+      return const _StatusStyle('Stok habis', _kRedBg, _kRedText);
+    case ProductStockStatus.restock:
+      return const _StatusStyle('Segera restock', _kOrangeBg, _kRestock);
+    case ProductStockStatus.monitor:
+      return const _StatusStyle('Perlu dipantau', AppColors.chip, _kGreyText);
+    case ProductStockStatus.safe:
+      return const _StatusStyle('Stok aman', AppColors.chip, _kGreyText);
+  }
+}
+
+String _etaText(ProductOverview product) {
+  final days = product.daysUntilStockout;
+  if (days == null) return 'Prediksi belum tersedia';
+  if (days <= 0) return 'Habis: Hari ini';
+  return 'Habis dlm $days hari';
+}
+
+IconData _etaIcon(ProductOverview product) {
+  final days = product.daysUntilStockout;
+  if (days == null) return Icons.info_outline;
+  if (days == 0) return Icons.event_busy_outlined;
+  if (days <= 3) return Icons.schedule;
+  if (days <= 7) return Icons.calendar_today_outlined;
+  return Icons.verified_outlined;
+}
+
+IconData _activityIcon(String movementType) {
+  return switch (movementType) {
+    'OUT' => Icons.point_of_sale,
+    'IN' => Icons.move_to_inbox_outlined,
+    _ => Icons.tune_rounded,
+  };
+}
+
+String _formatActivityTime(DateTime time) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final date = DateTime(time.year, time.month, time.day);
+  final clock = '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
+
+  final day = switch (today.difference(date).inDays) {
+    0 => 'Hari ini',
+    1 => 'Kemarin',
+    _ => '${time.day} ${_months[time.month - 1]} ${time.year}',
+  };
+
+  return '$day, $clock WIB';
 }

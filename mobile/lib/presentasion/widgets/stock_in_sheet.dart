@@ -6,43 +6,66 @@ import '../../core/theme/app_colors.dart';
 // Form "Catat Stok Masuk" dalam bentuk bottom sheet.
 // Simpan di: lib/presentasion/widgets/stock_in_sheet.dart
 //
+// Sheet ini hanya mengumpulkan input; penyimpanan ke Supabase dilakukan
+// pemanggil (lihat ProductRepository.recordStockIn).
+//
 // Contoh pemakaian:
-//   showStockInSheet(context, products: [
-//     StockInProduct(name: 'Beras Premium 5 kg', unit: 'karung', suggested: 15),
+//   final result = await showStockInSheet(context, products: [
+//     StockInProduct(
+//       id: product.id,
+//       name: product.name,
+//       unit: product.unit,
+//       suggested: 15,
+//     ),
 //   ]);
+//   if (result == null) return;
+//   await repository.recordStockIn(
+//     productId: result.product.id!,
+//     quantity: result.quantity,
+//   );
 // =====================================================================
 
 class StockInProduct {
+  /// Id produk di tabel `products`. Wajib diisi bila hasil form akan
+  /// disimpan ke Supabase.
+  final String? id;
   final String name, unit;
   final int? suggested; // jumlah saran dari prediksi (opsional)
-  const StockInProduct({required this.name, required this.unit, this.suggested});
+
+  const StockInProduct({
+    this.id,
+    required this.name,
+    required this.unit,
+    this.suggested,
+  });
+}
+
+/// Isi form stok masuk yang sudah divalidasi.
+class StockInResult {
+  const StockInResult({required this.product, required this.quantity});
+
+  final StockInProduct product;
+  final int quantity;
 }
 
 /// Menampilkan form stok masuk. Jika [products] berisi lebih dari satu,
 /// pengguna bisa memilih produknya lebih dulu.
-Future<void> showStockInSheet(
+///
+/// Mengembalikan `null` bila pengguna menutup sheet tanpa menyimpan.
+Future<StockInResult?> showStockInSheet(
   BuildContext context, {
   required List<StockInProduct> products,
   int initialIndex = 0,
-}) async {
-  final result = await showModalBottomSheet<({StockInProduct product, int qty})>(
+}) {
+  return showModalBottomSheet<StockInResult>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (_) => _StockInSheet(products: products, initialIndex: initialIndex),
-  );
-
-  if (result == null || !context.mounted) return;
-
-  // TODO: sambungkan ke POST /api/products/{id}/restock (quantity)
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-          'Stok masuk dicatat: ${result.qty} ${result.product.unit} ${result.product.name}'),
-    ),
+    builder: (_) =>
+        _StockInSheet(products: products, initialIndex: initialIndex),
   );
 }
 
@@ -93,7 +116,7 @@ class _StockInSheetState extends State<_StockInSheet> {
       setState(() => _showError = true);
       return;
     }
-    Navigator.pop(context, (product: _product, qty: _qty));
+    Navigator.pop(context, StockInResult(product: _product, quantity: _qty));
   }
 
   @override

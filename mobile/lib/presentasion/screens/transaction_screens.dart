@@ -121,6 +121,18 @@ class _TransactionScreensState extends State<TransactionScreens> {
     );
   }
 
+  Future<void> _openStockIn() async {
+    final result = await showStockInSheet(
+      context,
+      products: _stockInProducts,
+    );
+    if (result == null || !mounted) return;
+    _soon(
+      'Stok masuk ${result.quantity} ${result.product.unit} '
+      '${result.product.name} valid, tetapi belum disimpan.',
+    );
+  }
+
   @override
   void dispose() {
     _searchCtrl.dispose();
@@ -168,10 +180,7 @@ class _TransactionScreensState extends State<TransactionScreens> {
                   const SizedBox(height: 18),
                   _ActionRow(
                     onSale: _openSaleEntry,
-                    onStockIn: () => showStockInSheet(
-                      context,
-                      products: _stockInProducts,
-                    ),
+                    onStockIn: _openStockIn,
                   ),
                   const SizedBox(height: 16),
                   IntrinsicHeight(
