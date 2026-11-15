@@ -1229,16 +1229,27 @@ class _RecommendationCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => showStockInSheet(
-                context,
-                products: [
-                  StockInProduct(
-                    name: d.name,
-                    unit: d.unit,
-                    suggested: d.restockQty,
+              onPressed: () async {
+                final result = await showStockInSheet(
+                  context,
+                  products: [
+                    StockInProduct(
+                      name: d.name,
+                      unit: d.unit,
+                      suggested: d.restockQty,
+                    ),
+                  ],
+                );
+                if (result == null || !context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Stok masuk ${result.quantity} ${result.product.unit} '
+                      '${result.product.name} valid, tetapi belum disimpan.',
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
               icon: const Icon(Icons.add_circle_outline_rounded, size: 22),
               label: const Text('Tambah Stok Masuk'),
               style: FilledButton.styleFrom(

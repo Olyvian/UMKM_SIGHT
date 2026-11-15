@@ -93,6 +93,10 @@ Untuk memakai halaman Produk dan skema inventaris, jalankan juga skrip berikut s
 
 `schema_Inventoris.sql` memigrasikan skema produk/prediksi yang sudah ada dan membuat cadangan tabel lama. Uji pada project non-produksi terlebih dahulu, tinjau perubahan dengan pemilik project, dan jangan jalankan sendiri pada project bersama.
 
+3. [`supabase/migration_record_sale_date.sql`](supabase/migration_record_sale_date.sql), setelah `schema_Inventoris.sql`.
+
+`migration_record_sale_date.sql` menambahkan parameter tanggal transaksi pada RPC `record_sale`, sehingga penjualan yang lupa dicatat bisa diisi dengan tanggal & jam sebenarnya. Tanpa skrip ini, tombol **Catat Penjualan** di Beranda tetap bisa dipakai, tetapi tanggal yang dipilih pengguna diabaikan server dan aplikasi menampilkan pesan agar skrip ini dijalankan.
+
 5. Untuk mengaktifkan halaman Produk, jalankan [`supabase/schema_Inventoris.sql`](supabase/schema_Inventoris.sql) di SQL Editor **setelah** `schema.sql`. Skrip ini menambahkan tabel produk, catatan perubahan stok, serta aturan aksesnya. Jangan jalankan skrip ini di project bersama sebelum perubahan skema disetujui tim.
 
 ### 1.3 Atur login email
@@ -199,6 +203,7 @@ Tanpa ini build **release** tidak bisa mengakses jaringan. Font Inter dimuat lew
 supabase/schema.sql           # tabel, trigger, RLS (jalankan di SQL Editor)
 supabase/forecast_schema.sql   # tabel produk dan prediksi (setelah schema.sql)
 supabase/schema_Inventoris.sql # migrasi produk, transaksi, stok, dan RLS
+supabase/migration_record_sale_date.sql # tanggal transaksi pada RPC record_sale
 env.example.json              # contoh konfigurasi (salin menjadi env.json)
 lib/
 ├── main.dart                 # entry point

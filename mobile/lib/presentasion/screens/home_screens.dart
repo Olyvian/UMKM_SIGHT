@@ -6,7 +6,9 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/dashboard/data/models/home_data.dart';
 import '../../features/dashboard/data/repositories/dashboard_repository.dart';
 import '../../features/products/data/models/product_overview.dart';
+import '../../features/products/data/repositories/product_repository.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/sale_entry_sheet.dart';
 import '../widgets/stock_in_sheet.dart';
 import 'analytics_screens.dart';
 import 'product_screens.dart';
@@ -46,23 +48,34 @@ class _HomeScreensState extends State<HomeScreens> {
   late final DashboardRepository _repository;
   late Future<HomeData> _homeFuture;
 
+  /// Data terakhir yang berhasil dimuat. Dipakai sebagai `initialData`
+  /// supaya saat menyegarkan, isi beranda tetap tampil (tidak berkedip
+  /// menjadi spinner) sampai data baru tiba.
+  HomeData? _lastData;
+
   @override
   void initState() {
     super.initState();
     _repository = context.read<DashboardRepository>();
-    _homeFuture = _repository.fetchHome();
+    _homeFuture = _load();
+  }
+
+  Future<HomeData> _load() async {
+    final data = await _repository.fetchHome();
+    _lastData = data;
+    return data;
   }
 
   void _reload() {
     setState(() {
-      _homeFuture = _repository.fetchHome();
+      _homeFuture = _load();
     });
   }
 
   /// Dipakai RefreshIndicator: menunggu permintaan selesai agar indikator
   /// berhenti tepat saat data baru tampil.
   Future<void> _refresh() async {
-    final future = _repository.fetchHome();
+    final future = _load();
     setState(() => _homeFuture = future);
     try {
       await future;
@@ -90,6 +103,7 @@ class _HomeScreensState extends State<HomeScreens> {
             Expanded(
               child: FutureBuilder<HomeData>(
                 future: _homeFuture,
+                initialData: _lastData,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
@@ -115,7 +129,7 @@ class _HomeScreensState extends State<HomeScreens> {
                         const SizedBox(height: 22),
                         _StatRow(summary: data.summary),
                         const SizedBox(height: 22),
-                        const _ActionButtons(),
+                        _ActionButtons(onDataChanged: _reload),
                         const SizedBox(height: 32),
                         _SectionHeader(
                           title: 'Perlu Perhatian',
@@ -350,8 +364,165 @@ class _StatCard extends StatelessWidget {
 }
 
 // ---------- Tombol aksi ----------
-class _ActionButtons extends StatelessWidget {
-  const _ActionButtons();
+class _ActionButtons extends StatefulWidget {
+  const _ActionButtons({required this.onDataChanged});
+
+  /// Dipanggil setelah penjualan/stok masuk tersimpan agar angka ringkasan
+  /// dan daftar aktivitas ikut diperbarui.
+  final VoidCallback onDataChanged;
+
+  @override
+  State<_ActionButtons> createState() => _ActionButtonsState();
+}
+
+class _ActionButtonsState extends State<_ActionButtons> {
+  bool _busy = false;
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? _kRedText : null,
+        ),
+      );
+  }
+
+  String _errorText(Object error, String fallback) {
+    if (error is ProductFailure) return error.message;
+    return '$fallback $error';
+  }
+
+  /// Memuat produk aktif terbaru dari Supabase.
+  Future<List<ProductOverview>> _loadActiveProducts(
+    ProductRepository repository,
+  ) async {
+    final products = await repository.fetchProducts();
+    return products.where((product) => product.isActive).toList();
+  }
+
+  Future<void> _recordSale() async {
+    if (_busy) return;
+    final repository = context.read<ProductRepository>();
+    setState(() => _busy = true);
+    try {
+      final products = (await _loadActiveProducts(repository))
+          .where((product) => product.currentStock > 0)
+          .toList();
+      if (!mounted) return;
+      if (products.isEmpty) {
+        _showMessage(
+          'Belum ada produk aktif yang stoknya tersedia.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await showSaleEntrySheet(
+        context,
+        products: [
+          for (final product in products)
+            SaleEntryProduct(
+              id: product.id,
+              name: product.name,
+              unit: product.unit,
+              availableStock: product.currentStock,
+            ),
+        ],
+      );
+      if (result == null || !mounted) return;
+
+      final productId = result.product.id;
+      if (productId == null) {
+        _showMessage(
+          'Produk tidak dikenali. Muat ulang beranda.',
+          isError: true,
+        );
+        return;
+      }
+
+      await repository.recordSale(
+        productId: productId,
+        quantity: result.quantity,
+        transactionDate: result.dateTime,
+      );
+      if (!mounted) return;
+
+      _showMessage(
+        'Penjualan ${result.quantity} ${result.product.unit} '
+        '${result.product.name} tersimpan.',
+      );
+      widget.onDataChanged();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        _errorText(error, 'Gagal mencatat penjualan:'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _recordStockIn() async {
+    if (_busy) return;
+    final repository = context.read<ProductRepository>();
+    setState(() => _busy = true);
+    try {
+      final products = await _loadActiveProducts(repository);
+      if (!mounted) return;
+      if (products.isEmpty) {
+        _showMessage(
+          'Belum ada produk aktif. Tambahkan produk lebih dulu.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await showStockInSheet(
+        context,
+        products: [
+          for (final product in products)
+            StockInProduct(
+              id: product.id,
+              name: product.name,
+              unit: product.unit,
+            ),
+        ],
+      );
+      if (result == null || !mounted) return;
+
+      final productId = result.product.id;
+      if (productId == null) {
+        _showMessage(
+          'Produk tidak dikenali. Muat ulang beranda.',
+          isError: true,
+        );
+        return;
+      }
+
+      await repository.recordStockIn(
+        productId: productId,
+        quantity: result.quantity,
+      );
+      if (!mounted) return;
+
+      _showMessage(
+        'Stok masuk ${result.quantity} ${result.product.unit} '
+        '${result.product.name} tersimpan.',
+      );
+      widget.onDataChanged();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        _errorText(error, 'Gagal mencatat stok masuk:'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -364,13 +535,14 @@ class _ActionButtons extends StatelessWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            // TODO(langkah 5): sambungkan ke RPC record_sale.
-            onPressed: () {},
+            onPressed: _busy ? null : _recordSale,
             icon: const Icon(Icons.edit_note_rounded, size: 24),
             label: const FittedBox(child: Text('Catat Penjualan')),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.chip,
               foregroundColor: AppColors.textDark,
+              disabledBackgroundColor: AppColors.chip,
+              disabledForegroundColor: AppColors.hint,
               minimumSize: const Size.fromHeight(60),
               textStyle: textStyle,
               shape: shape,
@@ -381,26 +553,14 @@ class _ActionButtons extends StatelessWidget {
         const SizedBox(width: 14),
         Expanded(
           child: FilledButton.icon(
-            // TODO(langkah 5): ganti daftar contoh ini dengan produk dari
-            // Supabase dan simpan lewat RPC record_stock_in.
-            onPressed: () => showStockInSheet(
-              context,
-              products: const [
-                StockInProduct(
-                    name: 'Minyak Goreng Sania 2L',
-                    unit: 'botol',
-                    suggested: 24),
-                StockInProduct(
-                    name: 'Beras Premium 5 kg', unit: 'karung', suggested: 15),
-                StockInProduct(
-                    name: 'Gula Pasir 1 kg', unit: 'kg', suggested: 25),
-              ],
-            ),
+            onPressed: _busy ? null : _recordStockIn,
             icon: const Icon(Icons.add_box_outlined, size: 24),
             label: const FittedBox(child: Text('+ Stok Masuk')),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.chip,
+              disabledForegroundColor: AppColors.hint,
               minimumSize: const Size.fromHeight(60),
               textStyle: textStyle,
               shape: shape,
