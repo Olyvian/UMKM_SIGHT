@@ -282,23 +282,37 @@ error turun ke kisaran 25–40%.
 
 ### 5d. Bandingkan dengan data yang punya pola
 
-Untuk menunjukkan bahwa masalahnya ada di data dan bukan di kode, pipeline
-yang sama pernah diuji pada *Store Item Demand Forecasting* (data publik
-Kaggle, 2 toko × 15 item, 2013–2017):
+Untuk menunjukkan bahwa masalahnya ada di data dan bukan di kode, kode yang
+**sama persis** dijalankan pada *Store Item Demand Forecasting* (data publik
+Kaggle, diambil 2 toko × 15 item, 2013–2017, 54.780 baris):
 
-| Dataset | Autokorelasi lag-1 | WAPE median 7 hari |
-|---|---|---|
-| Store Item Demand (punya pola) | **0,575** | **20,6%** |
-| Dataset retail sekarang (jarang) | rendah | 100% (level produk) |
-| Dataset FMCG acak (kontrol negatif) | **−0,008** | batas teoretis 42,1% |
+| Dataset | Volume | Autokorelasi lag-1 (median) | WAPE median 7 hari | Lolos ≤20% |
+|---|---|---|---|---|
+| Store Item Demand (punya pola) | **61,7 unit/hari** | **0,595** | **20,6%** | **13/30** |
+| Dataset retail sekarang | 0,77 unit/hari | 0,322 | 100% | 0/82 |
+| Kontrol negatif: acak Poisson, volume disamakan dengan retail | 0,78 unit/hari | 0,007 | 85,7% | 0/97 |
 
-Dataset itu punya rata-rata **61,7 unit/hari per produk** dan autokorelasi
-0,575 — hari ini benar-benar dipengaruhi kemarin. Di sana WAPE median 20,6%
-dan 13 dari 30 produk lolos target.
+Tiga baris itu dibaca begini:
 
-Perbedaan besar ini menunjukkan hal yang sama berulang kali:
-**kualitas dan kepadatan data menentukan batas akurasi, bukan kerumitan
-model.** Untuk mengulanginya, `scripts/download_dataset.py` masih tersedia.
+- Pada data yang **padat** (61,7 unit/hari), pipeline mencapai WAPE 20,6% dan
+  13 dari 30 produk lolos target. Jadi kodenya bisa akurat — syaratnya
+  permintaannya cukup padat.
+- Pada dataset retail sekarang (0,77 unit/hari), hasilnya 100%.
+- **Baris ketiga adalah bukti terpentingnya.** Saya buat deret **acak murni**
+  (Poisson, tanpa pola apa pun) dengan volume dan panjang yang sama seperti
+  data retail. Hasilnya WAPE median **85,7%**, dan 43 dari 97 deret acak itu
+  juga persis 100%. Artinya: pada volume 0,77 unit/hari, deret yang **tidak
+  mengandung pola apa pun** pun menghasilkan error di kisaran yang sama
+  dengan data asli.
+
+Kesimpulannya bukan "modelnya bagus" atau "modelnya rusak", melainkan:
+**pada tingkat kepadatan ini, akurasi sudah dibatasi oleh datanya, bukan oleh
+algoritmanya.** Inilah alasan agregasi (bagian 5c) adalah jalan keluar yang
+masuk akal — bukan mengganti model dengan yang lebih rumit.
+
+> Angka di tabel ini diukur ulang pada 2026-11-15 memakai
+> `scripts/download_dataset.py` (unduh 6,1 detik) + `evaluate_models()`,
+> sehingga bisa direproduksi sendiri.
 
 ## 6. Keluaran
 
@@ -410,8 +424,9 @@ datar untuk dimodelkan lebih rumit.
   otomatis bila data terakhir lebih dari 30 hari yang lalu.
 - Target akurasi ≤20% **tidak tercapai** pada dataset ini: WAPE median 100%
   di level produk, 67,1% di level subkategori. Penyebab utamanya kepadatan
-  data (median 0,77 unit/hari, 56% hari nol), bukan bug — dan itu dibuktikan
-  dengan angka, bukan diklaim.
+  data (median 0,77 unit/hari, 56% hari nol), bukan bug. Bukti paling kuat
+  ada di bagian 5d: deret **acak murni** dengan volume sama pun menghasilkan
+  WAPE median 85,7%, jadi batas akurasi di sini ditentukan volume data.
 - Pada unit bervolume tinggi (≥20 unit/hari), error turun ke kisaran
   25–40%. Belum ada satu pun unit yang mencapai ≤20% di dataset ini.
 - **Belum ada agregasi resmi di pipeline.** Analisis subkategori di bagian
