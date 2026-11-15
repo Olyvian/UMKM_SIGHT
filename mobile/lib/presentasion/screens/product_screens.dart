@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../features/products/data/models/product_overview.dart';
+import '../../features/products/data/repositories/product_repository.dart';
+import '../../features/products/presentation/widgets/product_form_dialog.dart';
+import '../../features/products/presentation/widgets/stock_adjustment_dialog.dart';
+import '../../features/products/presentation/widgets/stock_in_dialog.dart';
 import '../widgets/app_shell.dart';
-import 'product_detail_screens.dart';
-
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kRestock = Color(0xFF9A3412);
@@ -13,68 +17,6 @@ const _kOrangeBg = Color(0xFFFFEDE0);
 const _kGreyText = Color(0xFF334155);
 const _kChipActiveBg = Color(0xFFE0E7FF);
 const _kCountBg = Color(0xFFC7D2FE);
-
-enum StockStatus { habis, restock, pantau, aman }
-
-class Product {
-  final String name, sku, stock, eta;
-  final StockStatus status;
-  final IconData etaIcon;
-  final String? imagePath; // contoh: 'assets/images/minyak.png'
-
-  const Product({
-    required this.name,
-    required this.sku,
-    required this.stock,
-    required this.status,
-    required this.eta,
-    required this.etaIcon,
-    this.imagePath,
-  });
-}
-
-const _products = <Product>[
-  Product(
-    name: 'Minyak Goreng Sania 2L',
-    sku: 'MKS-2L-01',
-    stock: '0 botol',
-    status: StockStatus.habis,
-    eta: 'Habis: Hari ini',
-    etaIcon: Icons.event_busy_outlined,
-  ),
-  Product(
-    name: 'Beras Premium 5 kg',
-    sku: 'BRS-5KG-04',
-    stock: '4 karung',
-    status: StockStatus.restock,
-    eta: 'Habis dlm 2 hari',
-    etaIcon: Icons.schedule,
-  ),
-  Product(
-    name: 'Gula Pasir 1 kg',
-    sku: 'GLP-1KG-02',
-    stock: '9 kg',
-    status: StockStatus.pantau,
-    eta: 'Habis dlm 5 hari',
-    etaIcon: Icons.calendar_today_outlined,
-  ),
-  Product(
-    name: 'Kecap Manis Botol 600 ml',
-    sku: 'KCP-600-08',
-    stock: '24 botol',
-    status: StockStatus.aman,
-    eta: 'Habis dlm 18 hari',
-    etaIcon: Icons.verified_outlined,
-  ),
-  Product(
-    name: 'Mi Instan Goreng',
-    sku: 'MIG-DUS-03',
-    stock: '38 bungkus',
-    status: StockStatus.aman,
-    eta: 'Prediksi belum tersedia',
-    etaIcon: Icons.info_outline,
-  ),
-];
 
 // =====================================================================
 class ProductScreens extends StatefulWidget {
@@ -87,21 +29,191 @@ class ProductScreens extends StatefulWidget {
 class _ProductScreensState extends State<ProductScreens> {
   final _searchCtrl = TextEditingController();
   String _filter = 'Semua';
+  late final ProductRepository _productRepository;
+  late Future<List<ProductOverview>> _productsFuture;
+  bool _isWorking = false;
 
   static const _filters = ['Semua', 'Stok aman', 'Perlu restock', 'Stok habis'];
 
-  bool _matchFilter(Product p) {
+  @override
+  void initState() {
+    super.initState();
+    _productRepository = context.read<ProductRepository>();
+    _productsFuture = _productRepository.fetchProducts();
+  }
+
+  void _refreshProducts() {
+    setState(() {
+      _productsFuture = _productRepository.fetchProducts();
+    });
+  }
+
+  bool _matchFilter(ProductOverview product) {
     switch (_filter) {
       case 'Stok aman':
-        return p.status == StockStatus.aman;
+        return product.status == ProductStockStatus.safe;
       case 'Perlu restock':
-        return p.status == StockStatus.restock ||
-            p.status == StockStatus.pantau;
+        return product.status == ProductStockStatus.restock ||
+            product.status == ProductStockStatus.monitor;
       case 'Stok habis':
-        return p.status == StockStatus.habis;
+        return product.status == ProductStockStatus.outOfStock;
       default:
         return true;
     }
+  }
+
+  Future<void> _mutate({
+    required Future<void> Function() operation,
+    required String successMessage,
+  }) async {
+    if (_isWorking) return;
+    setState(() => _isWorking = true);
+    try {
+      await operation();
+      if (!mounted) return;
+      _refreshProducts();
+      _showMessage(successMessage);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is ProductFailure
+          ? error.message
+          : 'Operasi produk gagal: $error';
+      _showMessage(message, isError: true);
+    } finally {
+      if (mounted) setState(() => _isWorking = false);
+    }
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? _kRedText : null,
+        ),
+      );
+  }
+
+  Future<void> _editProduct([ProductOverview? product]) async {
+    if (_isWorking) return;
+    final form = await showProductFormDialog(context, product: product);
+    if (form == null) return;
+
+    await _mutate(
+      operation: () => _saveProduct(product, form),
+      successMessage: product == null
+          ? 'Produk berhasil ditambahkan.'
+          : 'Produk diperbarui.',
+    );
+  }
+
+  Future<void> _saveProduct(
+    ProductOverview? product,
+    ProductFormData form,
+  ) async {
+    if (product == null) {
+      final id = await _productRepository.createProduct(
+        stockCode: form.stockCode,
+        name: form.name,
+        unit: form.unit,
+        unitPrice: form.unitPrice,
+        reorderThreshold: form.reorderThreshold,
+        isMonitored: form.isMonitored,
+      );
+      if (form.image != null) {
+        if (mounted) _refreshProducts();
+        await _productRepository.uploadProductImage(
+          productId: id,
+          image: form.image!,
+        );
+      }
+      return;
+    }
+
+    await _productRepository.updateProduct(
+      id: product.id,
+      stockCode: form.stockCode,
+      name: form.name,
+      unit: form.unit,
+      unitPrice: form.unitPrice,
+      reorderThreshold: form.reorderThreshold,
+      isMonitored: form.isMonitored,
+    );
+    if (form.image != null) {
+      if (mounted) _refreshProducts();
+      await _productRepository.uploadProductImage(
+        productId: product.id,
+        image: form.image!,
+        previousPath: product.imagePath,
+      );
+    }
+  }
+
+  Future<void> _recordStockIn(ProductOverview product) async {
+    if (_isWorking) return;
+    final form = await showStockInDialog(context, product: product);
+    if (form == null) return;
+
+    await _mutate(
+      operation: () => _productRepository.recordStockIn(
+        productId: product.id,
+        quantity: form.quantity,
+        note: form.note,
+      ),
+      successMessage: 'Stok masuk berhasil dicatat.',
+    );
+  }
+
+  Future<void> _adjustStock(ProductOverview product) async {
+    if (_isWorking) return;
+    final form = await showStockAdjustmentDialog(context, product: product);
+    if (form == null) return;
+
+    await _mutate(
+      operation: () => _productRepository.adjustStock(
+        productId: product.id,
+        newStock: form.newStock,
+        note: form.note,
+      ),
+      successMessage: 'Stok berhasil dikoreksi.',
+    );
+  }
+
+  Future<void> _archiveProduct(ProductOverview product) async {
+    if (_isWorking) return;
+    final shouldArchive = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Arsipkan produk?'),
+        content: Text(
+          '${product.name} tidak akan tampil lagi di daftar produk aktif.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Arsipkan'),
+          ),
+        ],
+      ),
+    );
+    if (shouldArchive != true) return;
+
+    await _mutate(
+      operation: () => _productRepository.archiveProduct(product.id),
+      successMessage: 'Produk berhasil diarsipkan.',
+    );
+  }
+
+  Future<void> _restoreProduct(ProductOverview product) async {
+    await _mutate(
+      operation: () => _productRepository.restoreProduct(product.id),
+      successMessage: 'Produk berhasil dipulihkan.',
+    );
   }
 
   @override
@@ -112,17 +224,6 @@ class _ProductScreensState extends State<ProductScreens> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _searchCtrl.text.trim().toLowerCase();
-    final list = _products
-        .where((p) => _matchFilter(p) && p.name.toLowerCase().contains(query))
-        .toList();
-    final needAction = _products
-        .where(
-          (p) =>
-              p.status == StockStatus.habis || p.status == StockStatus.restock,
-        )
-        .length;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -131,51 +232,110 @@ class _ProductScreensState extends State<ProductScreens> {
           children: [
             const AppTopBar(),
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                children: [
-                  _Header(onAdd: () {}),
-                  const SizedBox(height: 18),
-                  _SearchField(
-                    controller: _searchCtrl,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 16),
-                  _FilterChips(
-                    filters: _filters,
-                    selected: _filter,
-                    totalCount: _products.length,
-                    onSelect: (f) => setState(() => _filter = f),
-                  ),
-                  const SizedBox(height: 18),
-                  _SummaryCard(count: needAction, onAudit: () {}),
-                  const SizedBox(height: 16),
-                  if (list.isEmpty) const _EmptyState(),
-                  for (final p in list)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _ProductTile(
-                        product: p,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProductDetailScreens(sku: p.sku),
+              child: FutureBuilder<List<ProductOverview>>(
+                future: _productsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return _LoadError(
+                      message: snapshot.error.toString(),
+                      onRetry: _refreshProducts,
+                    );
+                  }
+
+                  final products = snapshot.data ?? const <ProductOverview>[];
+                  final activeProducts =
+                      products.where((product) => product.isActive).toList();
+                  final archivedProducts =
+                      products.where((product) => !product.isActive).toList();
+                  final query = _searchCtrl.text.trim().toLowerCase();
+                  final list = activeProducts
+                      .where(
+                        (product) =>
+                            _matchFilter(product) &&
+                            product.name.toLowerCase().contains(query),
+                      )
+                      .toList();
+                  final archivedList = archivedProducts
+                      .where(
+                        (product) => product.name.toLowerCase().contains(query),
+                      )
+                      .toList();
+                  final needAction = activeProducts
+                      .where(
+                        (product) =>
+                            product.status == ProductStockStatus.outOfStock ||
+                            product.status == ProductStockStatus.restock,
+                      )
+                      .length;
+
+                  return ListView(
+                    physics: const BouncingScrollPhysics(),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                    children: [
+                      _Header(
+                        onAdd: _isWorking ? null : () => _editProduct(),
+                      ),
+                      const SizedBox(height: 18),
+                      _SearchField(
+                        controller: _searchCtrl,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 16),
+                      _FilterChips(
+                        filters: _filters,
+                        selected: _filter,
+                        totalCount: activeProducts.length,
+                        onSelect: (filter) => setState(() => _filter = filter),
+                      ),
+                      const SizedBox(height: 18),
+                      _SummaryCard(count: needAction, onAudit: () {}),
+                      const SizedBox(height: 16),
+                      if (list.isEmpty && archivedList.isEmpty)
+                        _EmptyState(
+                          isNoProducts: activeProducts.isEmpty &&
+                              archivedProducts.isEmpty,
+                        ),
+                      for (final product in list)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _ProductTile(
+                            product: product,
+                            onTap: () => _editProduct(product),
+                            onStockIn: () => _recordStockIn(product),
+                            onAdjustStock: () => _adjustStock(product),
+                            onArchive: () => _archiveProduct(product),
                           ),
                         ),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  const _SyncFooter(),
-                ],
+                      if (archivedList.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _ArchivedSectionHeader(count: archivedList.length),
+                        const SizedBox(height: 12),
+                        for (final product in archivedList)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _ArchivedProductTile(
+                              product: product,
+                              onRestore: () => _restoreProduct(product),
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 12),
+                      const _SyncFooter(),
+                    ],
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
-            bottomNavigationBar: const AppBottomNav(current: 1),
+      bottomNavigationBar: const AppBottomNav(current: 1),
     );
   }
 }
@@ -183,23 +343,21 @@ class _ProductScreensState extends State<ProductScreens> {
 // ---------- Kartu dasar (bayangan lembut + efek tap) ----------
 class _SoftCard extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
-  final double radius;
   final VoidCallback? onTap;
+  final Color backgroundColor;
 
   const _SoftCard({
     required this.child,
-    this.padding = const EdgeInsets.all(14),
-    this.radius = 24,
     this.onTap,
+    this.backgroundColor = AppColors.surface,
   });
 
   @override
   Widget build(BuildContext context) {
-    final r = BorderRadius.circular(radius);
+    final r = BorderRadius.circular(24);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: backgroundColor,
         borderRadius: r,
         boxShadow: const [
           BoxShadow(
@@ -215,85 +373,11 @@ class _SoftCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(padding: padding, child: child),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: child,
+          ),
         ),
-      ),
-    );
-  }
-}
-
-// ---------- Top bar ----------
-class _TopBar extends StatelessWidget {
-  const _TopBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FB),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TOKO UMKM',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Toko Berkah Jaya',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.textMuted,
-            size: 28,
-          ),
-          const SizedBox(width: 18),
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary,
-            child: Icon(Icons.person_outline_rounded, color: Colors.white),
-          ),
-        ],
       ),
     );
   }
@@ -301,7 +385,7 @@ class _TopBar extends StatelessWidget {
 
 // ---------- Header + tombol tambah ----------
 class _Header extends StatelessWidget {
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
   const _Header({required this.onAdd});
 
   @override
@@ -570,36 +654,37 @@ class _SummaryCard extends StatelessWidget {
 
 // ---------- Item produk ----------
 class _ProductTile extends StatelessWidget {
-  final Product product;
+  final ProductOverview product;
   final VoidCallback onTap;
-  const _ProductTile({required this.product, required this.onTap});
+  final VoidCallback onStockIn;
+  final VoidCallback onAdjustStock;
+  final VoidCallback onArchive;
+
+  const _ProductTile({
+    required this.product,
+    required this.onTap,
+    required this.onStockIn,
+    required this.onAdjustStock,
+    required this.onArchive,
+  });
 
   @override
   Widget build(BuildContext context) {
     final s = _statusStyle(product.status);
-    final placeholder = Container(
-      width: 64,
-      height: 64,
-      color: AppColors.chip,
-      child: const Icon(Icons.shopping_bag_outlined, color: AppColors.hint),
-    );
 
     return _SoftCard(
       onTap: onTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: product.imagePath == null
-                ? placeholder
-                : Image.asset(
-                    product.imagePath!,
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => placeholder,
-                  ),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.chip,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: _ProductThumbnail(product: product),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -624,13 +709,12 @@ class _ProductTile extends StatelessWidget {
                       color: AppColors.textMuted,
                     ),
                     children: [
-                      TextSpan(text: 'SKU: ${product.sku}  •  '),
+                      TextSpan(text: 'SKU: ${product.stockCode}  •  '),
                       TextSpan(
-                        text: 'Sisa: ${product.stock}',
+                        text: 'Sisa: ${product.currentStock} ${product.unit}',
                         style: TextStyle(
-                          fontWeight: s.stockBold
-                              ? FontWeight.w500
-                              : FontWeight.w600,
+                          fontWeight:
+                              s.stockBold ? FontWeight.w500 : FontWeight.w600,
                           color: s.stockColor,
                         ),
                       ),
@@ -648,13 +732,13 @@ class _ProductTile extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          product.etaIcon,
+                          _etaIcon(product),
                           size: 17,
                           color: AppColors.textMuted,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          product.eta,
+                          _etaText(product),
                           style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.textMuted,
@@ -667,8 +751,183 @@ class _ProductTile extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          IconButton(
+            tooltip: 'Edit produk',
+            onPressed: onTap,
+            icon: const Icon(Icons.edit_outlined, color: AppColors.textMuted),
+          ),
+          PopupMenuButton<_ProductAction>(
+            tooltip: 'Aksi produk',
+            onSelected: (action) {
+              switch (action) {
+                case _ProductAction.stockIn:
+                  onStockIn();
+                case _ProductAction.adjustStock:
+                  onAdjustStock();
+                case _ProductAction.archive:
+                  onArchive();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _ProductAction.stockIn,
+                child: Text('Catat stok masuk'),
+              ),
+              PopupMenuItem(
+                value: _ProductAction.adjustStock,
+                child: Text('Koreksi stok'),
+              ),
+              PopupMenuItem(
+                value: _ProductAction.archive,
+                child: Text('Arsipkan produk'),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _ArchivedSectionHeader extends StatelessWidget {
+  const _ArchivedSectionHeader({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.archive_outlined,
+            color: AppColors.textMuted, size: 20),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            'Diarsipkan',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          '$count',
+          style: const TextStyle(color: AppColors.textMuted),
+        ),
+      ],
+    );
+  }
+}
+
+class _ArchivedProductTile extends StatelessWidget {
+  const _ArchivedProductTile({
+    required this.product,
+    required this.onRestore,
+  });
+
+  final ProductOverview product;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    const archivedTextColor = Color(0xFF64748B);
+
+    return _SoftCard(
+      backgroundColor: const Color(0xFFF1F5F9),
+      child: Row(
+        children: [
+          Opacity(
+            opacity: 0.55,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: _ProductThumbnail(product: product),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: archivedTextColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'SKU: ${product.stockCode}  •  '
+                  'Sisa: ${product.currentStock} ${product.unit}',
+                  style: const TextStyle(
+                    color: archivedTextColor,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Produk diarsipkan',
+                  style: TextStyle(
+                    color: archivedTextColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Pulihkan produk',
+            onPressed: onRestore,
+            icon:
+                const Icon(Icons.unarchive_outlined, color: archivedTextColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductThumbnail extends StatelessWidget {
+  const _ProductThumbnail({required this.product});
+
+  final ProductOverview product;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = product.imagePath;
+    if (path == null || path.isEmpty) {
+      return const Icon(
+        Icons.shopping_bag_outlined,
+        color: AppColors.hint,
+      );
+    }
+
+    final error = product.imageError ?? 'Gambar produk gagal dimuat.';
+    final url = product.imageUrl;
+    if (url == null) {
+      return Tooltip(
+        message: error,
+        child: const Icon(Icons.broken_image_outlined, color: AppColors.hint),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (context, exception, stackTrace) => Tooltip(
+          message: error,
+          child: const Icon(Icons.broken_image_outlined, color: AppColors.hint),
+        ),
       ),
     );
   }
@@ -725,9 +984,11 @@ class _Style {
   });
 }
 
-_Style _statusStyle(StockStatus s) {
+enum _ProductAction { stockIn, adjustStock, archive }
+
+_Style _statusStyle(ProductStockStatus s) {
   switch (s) {
-    case StockStatus.habis:
+    case ProductStockStatus.outOfStock:
       return const _Style(
         'Stok habis',
         _kRedBg,
@@ -735,7 +996,7 @@ _Style _statusStyle(StockStatus s) {
         _kRedText,
         stockBold: false,
       );
-    case StockStatus.restock:
+    case ProductStockStatus.restock:
       return const _Style(
         'Segera restock',
         _kOrangeBg,
@@ -743,14 +1004,14 @@ _Style _statusStyle(StockStatus s) {
         _kRestock,
         stockBold: false,
       );
-    case StockStatus.pantau:
+    case ProductStockStatus.monitor:
       return const _Style(
         'Perlu dipantau',
         AppColors.chip,
         _kGreyText,
         AppColors.textDark,
       );
-    case StockStatus.aman:
+    case ProductStockStatus.safe:
       return const _Style(
         'Stok aman',
         AppColors.chip,
@@ -760,23 +1021,86 @@ _Style _statusStyle(StockStatus s) {
   }
 }
 
+String _etaText(ProductOverview product) {
+  final days = product.daysUntilStockout;
+  if (days == null) return 'Prediksi belum tersedia';
+  if (days <= 0) return 'Habis: Hari ini';
+  return 'Habis dlm $days hari';
+}
+
+IconData _etaIcon(ProductOverview product) {
+  final days = product.daysUntilStockout;
+  if (days == null) return Icons.info_outline;
+  if (days == 0) return Icons.event_busy_outlined;
+  if (days <= 3) return Icons.schedule;
+  if (days <= 7) return Icons.calendar_today_outlined;
+  return Icons.verified_outlined;
+}
+
 // ---------- Kondisi kosong ----------
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.isNoProducts});
+
+  final bool isNoProducts;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 36),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
       child: Column(
         children: [
-          Icon(Icons.search_off_rounded, size: 44, color: AppColors.hint),
-          SizedBox(height: 10),
+          Icon(
+            isNoProducts
+                ? Icons.inventory_2_outlined
+                : Icons.search_off_rounded,
+            size: 44,
+            color: AppColors.hint,
+          ),
+          const SizedBox(height: 10),
           Text(
-            'Produk tidak ditemukan',
-            style: TextStyle(fontSize: 16, color: AppColors.textMuted),
+            isNoProducts ? 'Belum ada produk' : 'Produk tidak ditemukan',
+            style: const TextStyle(fontSize: 16, color: AppColors.textMuted),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, color: _kRedText, size: 40),
+            const SizedBox(height: 12),
+            const Text(
+              'Produk belum dapat dimuat',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Coba lagi'),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
 # UMKM Sight (Aplikasi Flutter)
 
-Aplikasi mobile UMKM Sight: halaman **Login** dan **Register**, lalu **Dashboard** (placeholder).
+Aplikasi mobile UMKM Sight: halaman **Login** dan **Register**, dashboard, serta pengelolaan produk dan stok.
 Flutter terhubung **langsung ke Supabase** (PostgreSQL + Auth) tanpa server backend perantara.
 Arsitektur berlapis: `go_router` + `flutter_bloc` + repository + `supabase_flutter`.
 
@@ -58,7 +58,7 @@ Karena database dipakai bersama, data uji semua orang bercampur.
 - **Pakai email uji bernama sendiri**, mis. `budi.uji1@tokoberkah.com`, dan hapus akun ujimu setelah selesai (**Authentication → Users**).
 - **Jangan menjalankan perintah `DELETE`, `DROP`, atau `TRUNCATE`** di SQL Editor project bersama tanpa memberi tahu tim. Khusus bagian pembersihan di `test_login.sql`: hanya jalankan untuk akun ujimu sendiri.
 - **Jangan mematikan RLS** di tabel mana pun, bahkan sementara untuk "mencoba cepat". Bila data tidak muncul, periksa policy-nya.
-- **Perubahan skema database** (tabel/kolom/policy baru): ubah `supabase/schema.sql` (tetap bisa dijalankan ulang) lewat pull request. Setelah di-merge, **satu orang** menjalankannya di SQL Editor dan mengabari tim. Jangan mengubah struktur langsung lewat Table Editor tanpa mencatatnya ke file SQL, agar skema di repo selalu sama dengan database.
+- **Perubahan skema database** (tabel/kolom/policy baru): ubah file SQL terkait di `supabase/` lewat pull request. Setelah di-merge, **satu orang** menjalankannya di SQL Editor dan mengabari tim. Jangan mengubah struktur langsung lewat Table Editor tanpa mencatatnya ke file SQL, agar skema di repo selalu sama dengan database.
 - **Jangan commit rahasia**: `env.json`, key, atau kata sandi database tidak boleh masuk Git. Bila terlanjur ter-commit, anggap key bocor dan minta pemilik membuat ulang.
 - **Ingin lingkungan terpisah?** Tiap anggota boleh membuat project Supabase gratis sendiri dengan mengikuti bagian 1 di bawah, lalu memakai URL dan key miliknya. Cocok untuk eksperimen yang berisiko merusak data bersama.
 
@@ -85,6 +85,15 @@ Aplikasi ini memakai Supabase sebagai database (PostgreSQL) dan sistem login. Se
 4. Cek di **Table Editor**: tabel `profiles` dan `stores` harus sudah ada.
 
 Skrip aman dijalankan ulang.
+
+Untuk memakai halaman Produk dan skema inventaris, jalankan juga skrip berikut secara berurutan:
+
+1. [`supabase/forecast_schema.sql`](supabase/forecast_schema.sql), setelah `schema.sql`.
+2. [`supabase/schema_Inventoris.sql`](supabase/schema_Inventoris.sql), setelah kedua skrip sebelumnya.
+
+`schema_Inventoris.sql` memigrasikan skema produk/prediksi yang sudah ada dan membuat cadangan tabel lama. Uji pada project non-produksi terlebih dahulu, tinjau perubahan dengan pemilik project, dan jangan jalankan sendiri pada project bersama.
+
+5. Untuk mengaktifkan halaman Produk, jalankan [`supabase/schema_Inventoris.sql`](supabase/schema_Inventoris.sql) di SQL Editor **setelah** `schema.sql`. Skrip ini menambahkan tabel produk, catatan perubahan stok, serta aturan aksesnya. Jangan jalankan skrip ini di project bersama sebelum perubahan skema disetujui tim.
 
 ### 1.3 Atur login email
 
@@ -188,6 +197,8 @@ Tanpa ini build **release** tidak bisa mengakses jaringan. Font Inter dimuat lew
 
 ```text
 supabase/schema.sql           # tabel, trigger, RLS (jalankan di SQL Editor)
+supabase/forecast_schema.sql   # tabel produk dan prediksi (setelah schema.sql)
+supabase/schema_Inventoris.sql # migrasi produk, transaksi, stok, dan RLS
 env.example.json              # contoh konfigurasi (salin menjadi env.json)
 lib/
 ├── main.dart                 # entry point
@@ -204,6 +215,7 @@ lib/
     ├── auth/
     │   ├── data/             # models, AuthRepository (Supabase Auth + profiles/stores)
     │   └── presentation/     # AuthBloc, LoginPage, RegisterPage, widgets
+    ├── products/             # model, repository, dan formulir produk/stok
     ├── dashboard/            # placeholder Dashboard
     └── splash/               # pemeriksaan sesi
 ```
@@ -220,4 +232,4 @@ lib/
 
 - Pendaftaran FCM token (notifikasi push)
 - Pemulihan kata sandi (tautan "Lupa kata sandi?" masih menampilkan info singkat)
-- Dashboard stok, transaksi, prediksi, dan pusat notifikasi
+- Integrasi transaksi, prediksi, dan pusat notifikasi
