@@ -1200,7 +1200,6 @@ class _RecommendationCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-<<<<<<< Updated upstream
               onPressed: () {
                 // TODO: buka halaman detail produk (kirim item.sku / id produk)
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1210,15 +1209,6 @@ class _RecommendationCard extends StatelessWidget {
                 );
               },
               icon: const Icon(Icons.arrow_forward_rounded, size: 22),
-=======
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProductDetailScreens(sku: product.stockCode),
-                ),
-              ),
-              icon: const Icon(Icons.arrow_forward_rounded, size: 20),
->>>>>>> Stashed changes
               label: const Text('Lihat Detail Produk'),
               iconAlignment: IconAlignment.end,
               style: FilledButton.styleFrom(
