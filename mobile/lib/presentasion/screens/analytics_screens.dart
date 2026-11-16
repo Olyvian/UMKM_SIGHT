@@ -1,7 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../core/theme/app_colors.dart';
+import '../../features/analytics/data/models/forecast_model.dart';
+import '../../features/analytics/data/repositories/forecast_repository.dart';
+import '../../features/products/data/models/product_overview.dart';
+import '../../features/products/data/repositories/product_repository.dart';
 import '../widgets/app_shell.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
@@ -15,7 +21,7 @@ const _kGrey = Color(0xFF334155);
 const _kBox = Color(0xFFEFF2FB);
 const _kBadgeBlue = Color(0xFFE0E7FF);
 
-const _kAlgorithm = 'Linear Time-Series Regression';
+const _kDefaultAlgorithm = 'ARIMA (Autoregressive Integrated Moving Average)';
 
 // ---------- Helper tanggal ----------
 const _months = [
@@ -26,111 +32,10 @@ const _months = [
 String _fmt(DateTime d, {bool year = false}) =>
     '${d.day} ${_months[d.month - 1]}${year ? ' ${d.year}' : ''}';
 
-// ---------- Data contoh (ganti dengan data API / hasil layanan ML nanti) ----------
-class _Insight {
-  final String name, sku, unit, supplier;
-  final int stock, threshold, daysLeft, restockQty, leadDays;
-  final double mae, rmse, mape;
-  final double trend, wave; // pembangkit data prediksi contoh
-  final List<double> actual; // 7 titik: H-6 sampai hari ini
-
-  const _Insight({
-    required this.name,
-    required this.sku,
-    required this.unit,
-    required this.supplier,
-    required this.stock,
-    required this.threshold,
-    required this.daysLeft,
-    required this.restockQty,
-    required this.leadDays,
-    required this.mae,
-    required this.rmse,
-    required this.mape,
-    required this.trend,
-    required this.wave,
-    required this.actual,
-  });
-
-  /// Prediksi permintaan harian untuk [h] hari ke depan.
-  List<double> forecast(int h) => List.generate(h, (i) {
-        final d = i + 1;
-        return math.max(0.0, actual.last + trend * d + wave * math.sin(d * 0.9));
-      });
-}
-
-const _insights = <_Insight>[
-  _Insight(
-    name: 'Beras Premium 5 kg',
-    sku: 'BRS-5KG-04',
-    unit: 'karung',
-    supplier: 'CV Sumber Tani',
-    stock: 4,
-    threshold: 6,
-    daysLeft: 2,
-    restockQty: 15,
-    leadDays: 1,
-    mae: 0.42,
-    rmse: 0.58,
-    mape: 6.4,
-    trend: 0.10,
-    wave: 0.25,
-    actual: [1.4, 1.8, 1.6, 2.1, 2.0, 2.2, 2.1],
-  ),
-  _Insight(
-    name: 'Minyak Goreng Sania 2L',
-    sku: 'MKS-2L-01',
-    unit: 'botol',
-    supplier: 'PT Mitra Pangan',
-    stock: 0,
-    threshold: 12,
-    daysLeft: 0,
-    restockQty: 24,
-    leadDays: 2,
-    mae: 0.90,
-    rmse: 1.30,
-    mape: 8.2,
-    trend: 0.08,
-    wave: 0.40,
-    actual: [2, 3, 2, 3, 2, 3, 3],
-  ),
-  _Insight(
-    name: 'Gula Pasir 1 kg',
-    sku: 'GLP-1KG-02',
-    unit: 'kg',
-    supplier: 'UD Manis Jaya',
-    stock: 9,
-    threshold: 10,
-    daysLeft: 5,
-    restockQty: 25,
-    leadDays: 2,
-    mae: 0.80,
-    rmse: 1.10,
-    mape: 9.7,
-    trend: 0.05,
-    wave: 0.20,
-    actual: [1.2, 1.6, 1.4, 1.9, 1.7, 1.8, 1.8],
-  ),
-  _Insight(
-    name: 'Kecap Manis Botol 600 ml',
-    sku: 'KCP-600-08',
-    unit: 'botol',
-    supplier: 'PT Sari Rasa',
-    stock: 24,
-    threshold: 8,
-    daysLeft: 18,
-    restockQty: 12,
-    leadDays: 3,
-    mae: 0.21,
-    rmse: 0.30,
-    mape: 12.5,
-    trend: 0.02,
-    wave: 0.10,
-    actual: [1.0, 1.4, 1.2, 1.5, 1.3, 1.4, 1.3],
-  ),
-];
-
-({String label, Color fg, Color bg}) _priority(int daysLeft) {
+({String label, Color fg, Color bg}) _priority(int? daysLeft) {
+  if (daysLeft == null) {
+    return (label: 'Stok aman', fg: _kGreen, bg: _kGreenBg);
+  }
   if (daysLeft <= 0) return (label: 'Stok habis', fg: _kRedText, bg: _kRedBg);
   if (daysLeft <= 3) {
     return (label: 'Prioritas tinggi', fg: _kBrown, bg: _kOrangeBg);
@@ -150,10 +55,94 @@ class AnalyticsScreens extends StatefulWidget {
 }
 
 class _AnalyticsScreensState extends State<AnalyticsScreens> {
+  bool _loading = true;
+  String? _errorMessage;
+
+  List<ProductOverview> _products = [];
   int _productIdx = 0;
   int _horizon = 7;
 
+  Forecast? _currentForecast;
+  List<double> _actualSales = [0, 0, 0, 0, 0, 0, 0];
+  bool _loadingForecast = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final productRepo = context.read<ProductRepository>();
+      final products = await productRepo.fetchProducts();
+
+      if (!mounted) return;
+
+      if (products.isEmpty) {
+        setState(() {
+          _products = [];
+          _loading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _products = products;
+        if (_productIdx >= products.length) {
+          _productIdx = 0;
+        }
+      });
+
+      await _loadForecastForProduct(products[_productIdx]);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadForecastForProduct(ProductOverview product) async {
+    setState(() {
+      _loadingForecast = true;
+    });
+
+    try {
+      final forecastRepo = context.read<ForecastRepository>();
+      final forecast = await forecastRepo.fetchLatestForecast(product.id);
+      final actual = await forecastRepo.fetchRecentDailySales(product.id, days: 7);
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentForecast = forecast;
+        _actualSales = actual.isEmpty ? List.filled(7, 0.0) : actual;
+        _loadingForecast = false;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _currentForecast = null;
+        _actualSales = List.filled(7, 0.0);
+        _loadingForecast = false;
+        _loading = false;
+      });
+    }
+  }
+
   Future<void> _pickProduct() async {
+    if (_products.isEmpty) return;
+
     final picked = await showModalBottomSheet<int>(
       context: context,
       backgroundColor: AppColors.surface,
@@ -178,38 +167,48 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Pilih produk',
+              const Text('Pilih Produk',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textDark)),
               const SizedBox(height: 8),
-              for (var i = 0; i < _insights.length; i++)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(_insights[i].name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textDark)),
-                  subtitle: Text('SKU: ${_insights[i].sku}'),
-                  trailing: i == _productIdx
-                      ? const Icon(Icons.check_circle_rounded,
-                          color: AppColors.primary)
-                      : null,
-                  onTap: () => Navigator.pop(context, i),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _products.length,
+                  itemBuilder: (ctx, i) {
+                    final p = _products[i];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(p.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark)),
+                      subtitle: Text('SKU: ${p.stockCode} • Stok: ${p.currentStock} ${p.unit}'),
+                      trailing: i == _productIdx
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: AppColors.primary)
+                          : null,
+                      onTap: () => Navigator.pop(context, i),
+                    );
+                  },
                 ),
+              ),
             ],
           ),
         ),
       ),
     );
-    if (picked != null) setState(() => _productIdx = picked);
+
+    if (picked != null && picked != _productIdx) {
+      setState(() => _productIdx = picked);
+      await _loadForecastForProduct(_products[picked]);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final item = _insights[_productIdx];
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -218,54 +217,167 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
           children: [
             const AppTopBar(),
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                children: [
-                  const _PageHeader(),
-                  const SizedBox(height: 18),
-                  _ProductSelector(item: item, onTap: _pickProduct),
-                  const SizedBox(height: 16),
-                  _StatusCard(item: item),
-                  const SizedBox(height: 30),
-                  _SectionTitle(
-                    title: 'Proyeksi Permintaan',
-                    subtitle: 'Tren aktual & kalkulasi ke depan',
-                    trailing: _HorizonSwitch(
-                      value: _horizon,
-                      onChanged: (h) => setState(() => _horizon = h),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _ChartCard(item: item, horizon: _horizon),
-                  const SizedBox(height: 30),
-                  const _SectionTitle(title: 'Rekomendasi Aksi'),
-                  const SizedBox(height: 14),
-                  _RecommendationCard(item: item),
-                  const SizedBox(height: 30),
-                  const _SectionTitle(
-                    title: 'Evaluasi Model',
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.verified_outlined,
-                            size: 18, color: AppColors.textMuted),
-                        SizedBox(width: 6),
-                        Text('Terkalibrasi',
-                            style: TextStyle(
-                                fontSize: 14, color: AppColors.textMuted)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _ModelCard(item: item),
-                ],
-              ),
+              child: _buildBody(),
             ),
           ],
         ),
       ),
       bottomNavigationBar: const AppBottomNav(current: 3),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded,
+                  size: 48, color: _kRedText),
+              const SizedBox(height: 12),
+              const Text(
+                'Terjadi kesalahan saat memuat data',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Coba Lagi'),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_products.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.chip,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.inventory_2_outlined,
+                    size: 32, color: AppColors.primary),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Belum Ada Produk',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Tambahkan produk di menu Produk terlebih dahulu untuk melihat analitik dan prediksi stok.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _loadData,
+                style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                child: const Text('Segarkan'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final currentProduct = _products[_productIdx];
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        children: [
+          const _PageHeader(),
+          const SizedBox(height: 18),
+          _ProductSelector(
+            product: currentProduct,
+            onTap: _pickProduct,
+          ),
+          const SizedBox(height: 16),
+          _StatusCard(
+            product: currentProduct,
+            forecast: _currentForecast,
+          ),
+          const SizedBox(height: 30),
+          _SectionTitle(
+            title: 'Proyeksi Permintaan',
+            subtitle: 'Tren aktual & peramalan ARIMA ke depan',
+            trailing: _HorizonSwitch(
+              value: _horizon,
+              onChanged: (h) => setState(() => _horizon = h),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _ChartCard(
+            product: currentProduct,
+            forecast: _currentForecast,
+            actual: _actualSales,
+            horizon: _horizon,
+            isLoading: _loadingForecast,
+          ),
+          const SizedBox(height: 30),
+          const _SectionTitle(title: 'Rekomendasi Aksi'),
+          const SizedBox(height: 14),
+          _RecommendationCard(
+            product: currentProduct,
+            forecast: _currentForecast,
+          ),
+          const SizedBox(height: 30),
+          const _SectionTitle(
+            title: 'Evaluasi Model ML',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified_outlined,
+                    size: 18, color: AppColors.textMuted),
+                SizedBox(width: 6),
+                Text('Terkalibrasi',
+                    style: TextStyle(
+                        fontSize: 14, color: AppColors.textMuted)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _ModelCard(
+            forecast: _currentForecast,
+            unit: currentProduct.unit,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -291,7 +403,7 @@ class _PageHeader extends StatelessWidget {
               Icon(Icons.auto_graph_rounded,
                   size: 16, color: AppColors.primary),
               SizedBox(width: 6),
-              Text('Kecerdasan Stok',
+              Text('Kecerdasan Stok UMKM',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -307,7 +419,7 @@ class _PageHeader extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 color: AppColors.textDark)),
         const SizedBox(height: 4),
-        const Text('Proyeksi kebutuhan stok berbasis model time-series',
+        const Text('Proyeksi kebutuhan stok berbasis model time-series ARIMA',
             style: TextStyle(fontSize: 14, color: AppColors.textMuted)),
       ],
     );
@@ -316,9 +428,9 @@ class _PageHeader extends StatelessWidget {
 
 // ---------- Pemilih produk ----------
 class _ProductSelector extends StatelessWidget {
-  final _Insight item;
+  final ProductOverview product;
   final VoidCallback onTap;
-  const _ProductSelector({required this.item, required this.onTap});
+  const _ProductSelector({required this.product, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -343,7 +455,7 @@ class _ProductSelector extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.name,
+                Text(product.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -351,7 +463,7 @@ class _ProductSelector extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: AppColors.textDark)),
                 const SizedBox(height: 2),
-                Text('SKU: ${item.sku}',
+                Text('SKU: ${product.stockCode} • ${product.category ?? "Umum"}',
                     style: const TextStyle(
                         fontSize: 13, color: AppColors.textMuted)),
               ],
@@ -367,14 +479,29 @@ class _ProductSelector extends StatelessWidget {
 
 // ---------- Status ketahanan stok ----------
 class _StatusCard extends StatelessWidget {
-  final _Insight item;
-  const _StatusCard({required this.item});
+  final ProductOverview product;
+  final Forecast? forecast;
+
+  const _StatusCard({required this.product, required this.forecast});
 
   @override
   Widget build(BuildContext context) {
-    final p = _priority(item.daysLeft);
-    final out = DateTime.now().add(Duration(days: item.daysLeft));
-    final daysText = item.daysLeft == 0 ? 'Hari ini' : '${item.daysLeft} Hari';
+    final daysLeft = forecast?.daysUntilStockout ?? product.daysUntilStockout;
+    final p = _priority(daysLeft);
+
+    final String daysText;
+    final String captionText;
+    if (daysLeft == null) {
+      daysText = 'Stok Aman';
+      captionText = 'Cukup selama horizon';
+    } else if (daysLeft <= 0) {
+      daysText = 'Hari ini';
+      captionText = 'Stok habis';
+    } else {
+      daysText = '$daysLeft Hari';
+      final out = DateTime.now().add(Duration(days: daysLeft));
+      captionText = 'Prediksi: ${_fmt(out, year: true)}';
+    }
 
     return SoftCard(
       padding: const EdgeInsets.all(16),
@@ -415,10 +542,10 @@ class _StatusCard extends StatelessWidget {
                   child: _InfoBox(
                     color: _kBox,
                     caption: 'Stok saat ini',
-                    value: '${item.stock}',
-                    suffix: ' ${item.unit}',
+                    value: '${product.currentStock}',
+                    suffix: ' ${product.unit}',
                     valueColor: AppColors.textDark,
-                    footer: 'Ambang batas: ${item.threshold} ${item.unit}',
+                    footer: 'Ambang batas: ${product.reorderThreshold} ${product.unit}',
                     footerColor: AppColors.textMuted,
                   ),
                 ),
@@ -426,11 +553,11 @@ class _StatusCard extends StatelessWidget {
                 Expanded(
                   child: _InfoBox(
                     color: p.bg.withAlpha(110),
-                    caption: 'Prediksi: ${_fmt(out, year: true)}',
+                    caption: captionText,
                     value: daysText,
-                    suffix: item.daysLeft == 0 ? '' : ' lagi',
+                    suffix: (daysLeft != null && daysLeft > 0) ? ' lagi' : '',
                     valueColor: p.fg,
-                    footer: 'Estimasi habis total',
+                    footer: daysLeft == null ? 'Tidak perlu restock' : 'Estimasi habis total',
                     footerColor: p.fg,
                     footerBold: true,
                   ),
@@ -481,7 +608,7 @@ class _InfoBox extends StatelessWidget {
                 TextSpan(
                     text: value,
                     style: TextStyle(
-                        fontSize: 30,
+                        fontSize: 26,
                         height: 1.1,
                         fontWeight: FontWeight.w700,
                         color: valueColor)),
@@ -585,15 +712,53 @@ class _HorizonSwitch extends StatelessWidget {
 
 // ---------- Kartu grafik ----------
 class _ChartCard extends StatelessWidget {
-  final _Insight item;
+  final ProductOverview product;
+  final Forecast? forecast;
+  final List<double> actual;
   final int horizon;
-  const _ChartCard({required this.item, required this.horizon});
+  final bool isLoading;
+
+  const _ChartCard({
+    required this.product,
+    required this.forecast,
+    required this.actual,
+    required this.horizon,
+    required this.isLoading,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final forecast = item.forecast(horizon);
-    final total = forecast.fold<double>(0, (a, b) => a + b);
-    final avg = total / horizon;
+    if (isLoading) {
+      return const SoftCard(
+        padding: EdgeInsets.all(32),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final hasForecast = forecast?.details != null && forecast!.details!.isNotEmpty;
+
+    // Ambil prediksi sesuai horizon yang dipilih
+    List<double> forecastValues = [];
+    if (hasForecast) {
+      final details = forecast!.details!;
+      if (details.length >= horizon) {
+        forecastValues = details.take(horizon).map((e) => e.predictedQty).toList();
+      } else {
+        forecastValues = details.map((e) => e.predictedQty).toList();
+        final lastVal = forecastValues.isNotEmpty ? forecastValues.last : 0.0;
+        while (forecastValues.length < horizon) {
+          forecastValues.add(lastVal);
+        }
+      }
+    } else {
+      // Fallback jika belum ada forecast detail
+      forecastValues = List.filled(horizon, 0.0);
+    }
+
+    final total = forecastValues.fold<double>(0, (a, b) => a + b);
+    final avg = total / math.max(1, horizon);
 
     final now = DateTime.now();
     String d(int off) => _fmt(now.add(Duration(days: off)));
@@ -610,31 +775,32 @@ class _ChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _LegendDot(color: AppColors.textMuted, text: 'Aktual (Penjualan)'),
+              const _LegendDot(color: AppColors.textMuted, text: 'Aktual (Penjualan)'),
               _LegendDot(
-                  color: AppColors.primary,
-                  text: 'Prediksi Kebutuhan',
-                  bold: true),
+                  color: hasForecast ? AppColors.primary : AppColors.hint,
+                  text: hasForecast ? 'Prediksi Permintaan' : 'Prediksi Belum Ada',
+                  bold: hasForecast),
             ],
           ),
           const SizedBox(height: 8),
           SizedBox(
             height: 220,
             child: TweenAnimationBuilder<double>(
-              key: ValueKey('${item.sku}-$horizon'),
+              key: ValueKey('${product.id}-$horizon-$hasForecast'),
               tween: Tween(begin: 0, end: 1),
               duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
               builder: (_, progress, __) => CustomPaint(
                 size: Size.infinite,
                 painter: _ChartPainter(
-                  actual: item.actual,
-                  forecast: forecast,
+                  actual: actual,
+                  forecast: forecastValues,
                   labels: labels,
                   progress: progress,
+                  isDashedForecast: !hasForecast,
                 ),
               ),
             ),
@@ -647,24 +813,37 @@ class _ChartCard extends StatelessWidget {
               color: _kBox,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text.rich(
-              TextSpan(
-                style:
-                    const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                children: [
-                  const TextSpan(text: 'Rata-rata permintaan '),
-                  TextSpan(
-                    text: '${avg.toStringAsFixed(1)} ${item.unit}/hari',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark),
+            child: hasForecast
+                ? Text.rich(
+                    TextSpan(
+                      style: const TextStyle(
+                          fontSize: 13, color: AppColors.textMuted),
+                      children: [
+                        const TextSpan(text: 'Rata-rata permintaan '),
+                        TextSpan(
+                          text: '${avg.toStringAsFixed(1)} ${product.unit}/hari',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark),
+                        ),
+                        TextSpan(
+                            text:
+                                ', total perkiraan ${total.round()} ${product.unit} dalam $horizon hari.'),
+                      ],
+                    ),
+                  )
+                : const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: AppColors.textMuted),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Prediksi detail belum tersedia di database. Jalankan pipeline ML untuk memperbarui.',
+                          style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                        ),
+                      ),
+                    ],
                   ),
-                  TextSpan(
-                      text:
-                          ', total ${total.round()} ${item.unit} dalam $horizon hari.'),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -700,7 +879,7 @@ class _LegendDot extends StatelessWidget {
 }
 
 class _AxisLabel {
-  final int offset; // selisih hari dari hari ini
+  final int offset;
   final String text;
   final Color color;
   final FontWeight weight;
@@ -708,16 +887,18 @@ class _AxisLabel {
 }
 
 class _ChartPainter extends CustomPainter {
-  final List<double> actual; // hari -6 sampai 0
-  final List<double> forecast; // hari 1 sampai horizon
+  final List<double> actual;
+  final List<double> forecast;
   final List<_AxisLabel> labels;
-  final double progress; // 0..1 untuk animasi garis prediksi
+  final double progress;
+  final bool isDashedForecast;
 
   const _ChartPainter({
     required this.actual,
     required this.forecast,
     required this.labels,
     required this.progress,
+    this.isDashedForecast = false,
   });
 
   static const _grid = Color(0x14000000);
@@ -754,18 +935,18 @@ class _ChartPainter extends CustomPainter {
     final totalDays = past + forecast.length;
 
     final all = [...actual, ...forecast];
-    var minV = all.reduce(math.min);
-    var maxV = all.reduce(math.max);
+    var minV = all.isEmpty ? 0.0 : all.reduce(math.min);
+    var maxV = all.isEmpty ? 10.0 : all.reduce(math.max);
     var pad = (maxV - minV) * 0.18;
     if (pad == 0) pad = 1;
-    minV -= pad;
+    minV = math.max(0.0, minV - pad);
     maxV += pad;
 
     double xOf(int day) =>
         side + (size.width - 2 * side) * (day + past) / totalDays;
     double yOf(double v) => top + chartH * (1 - (v - minV) / (maxV - minV));
 
-    // Garis bantu
+    // Garis bantu horizontal
     final gridPaint = Paint()
       ..color = _grid
       ..strokeWidth = 1;
@@ -775,28 +956,30 @@ class _ChartPainter extends CustomPainter {
     }
 
     // Garis aktual
-    final actualPts = [
-      for (var i = 0; i < actual.length; i++)
-        Offset(xOf(i - past), yOf(actual[i])),
-    ];
-    final actualPath = Path()..moveTo(actualPts.first.dx, actualPts.first.dy);
-    for (final p in actualPts.skip(1)) {
-      actualPath.lineTo(p.dx, p.dy);
-    }
-    canvas.drawPath(
-      actualPath,
-      Paint()
-        ..color = AppColors.textMuted
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-    for (final p in actualPts.take(actualPts.length - 1)) {
-      canvas.drawCircle(p, 3.5, Paint()..color = AppColors.textMuted);
+    if (actual.isNotEmpty) {
+      final actualPts = [
+        for (var i = 0; i < actual.length; i++)
+          Offset(xOf(i - past), yOf(actual[i])),
+      ];
+      final actualPath = Path()..moveTo(actualPts.first.dx, actualPts.first.dy);
+      for (final p in actualPts.skip(1)) {
+        actualPath.lineTo(p.dx, p.dy);
+      }
+      canvas.drawPath(
+        actualPath,
+        Paint()
+          ..color = AppColors.textMuted
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+      for (final p in actualPts.take(actualPts.length - 1)) {
+        canvas.drawCircle(p, 3.5, Paint()..color = AppColors.textMuted);
+      }
     }
 
-    // Garis "hari ini"
+    // Garis "Hari Ini"
     final tx = xOf(0);
     _dashed(
       canvas,
@@ -821,57 +1004,76 @@ class _ChartPainter extends CustomPainter {
           color: AppColors.textMuted),
     );
 
-    // Garis & area prediksi (dianimasikan dari kiri ke kanan)
-    final pts = [
-      Offset(tx, yOf(actual.last)),
-      for (var i = 0; i < forecast.length; i++)
-        Offset(xOf(i + 1), yOf(forecast[i])),
-    ];
-    final line = Path()..moveTo(pts.first.dx, pts.first.dy);
-    for (final p in pts.skip(1)) {
-      line.lineTo(p.dx, p.dy);
-    }
-    final area = Path.from(line)
-      ..lineTo(pts.last.dx, chartBottom)
-      ..lineTo(pts.first.dx, chartBottom)
-      ..close();
+    // Garis & area prediksi
+    if (forecast.isNotEmpty) {
+      final lastActual = actual.isNotEmpty ? actual.last : 0.0;
+      final pts = [
+        Offset(tx, yOf(lastActual)),
+        for (var i = 0; i < forecast.length; i++)
+          Offset(xOf(i + 1), yOf(forecast[i])),
+      ];
+      final line = Path()..moveTo(pts.first.dx, pts.first.dy);
+      for (final p in pts.skip(1)) {
+        line.lineTo(p.dx, p.dy);
+      }
+      final area = Path.from(line)
+        ..lineTo(pts.last.dx, chartBottom)
+        ..lineTo(pts.first.dx, chartBottom)
+        ..close();
 
-    canvas.save();
-    canvas.clipRect(Rect.fromLTRB(
-        tx - 1, 0, tx + (size.width - side - tx) * progress + 1, size.height));
+      canvas.save();
+      canvas.clipRect(Rect.fromLTRB(
+          tx - 1, 0, tx + (size.width - side - tx) * progress + 1, size.height));
 
-    canvas.drawPath(
-      area,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0x332563EB), Color(0x002563EB)],
-        ).createShader(Rect.fromLTRB(tx, top, size.width, chartBottom)),
-    );
-    _dashed(
-      canvas,
-      line,
-      Paint()
-        ..color = AppColors.primary
+      final fillColor = isDashedForecast
+          ? Colors.grey.withAlpha(20)
+          : const Color(0x332563EB);
+
+      canvas.drawPath(
+        area,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [fillColor, const Color(0x002563EB)],
+          ).createShader(Rect.fromLTRB(tx, top, size.width, chartBottom)),
+      );
+
+      final linePaint = Paint()
+        ..color = isDashedForecast ? AppColors.hint : AppColors.primary
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round,
-    );
+        ..strokeCap = StrokeCap.round;
 
-    final step = math.max(1, (forecast.length / 4).round());
-    for (var i = step; i < pts.length - 1; i += step) {
-      canvas.drawCircle(pts[i], 3.5, Paint()..color = AppColors.primary);
-    }
-    canvas.restore();
+      if (isDashedForecast) {
+        _dashed(canvas, line, linePaint, dash: 5, gap: 5);
+      } else {
+        _dashed(canvas, line, linePaint);
+      }
 
-    // Titik akhir prediksi & titik hari ini
-    if (progress >= 0.999) {
-      canvas.drawCircle(pts.last, 6.5, Paint()..color = Colors.white);
-      canvas.drawCircle(pts.last, 4.5, Paint()..color = AppColors.primary);
+      final step = math.max(1, (forecast.length / 4).round());
+      for (var i = step; i < pts.length - 1; i += step) {
+        canvas.drawCircle(
+            pts[i],
+            3.5,
+            Paint()
+              ..color =
+                  isDashedForecast ? AppColors.hint : AppColors.primary);
+      }
+      canvas.restore();
+
+      if (progress >= 0.999) {
+        canvas.drawCircle(pts.last, 6.5, Paint()..color = Colors.white);
+        canvas.drawCircle(
+            pts.last,
+            4.5,
+            Paint()
+              ..color =
+                  isDashedForecast ? AppColors.hint : AppColors.primary);
+      }
+      canvas.drawCircle(pts.first, 6.5, Paint()..color = Colors.white);
+      canvas.drawCircle(pts.first, 4.5, Paint()..color = AppColors.textDark);
     }
-    canvas.drawCircle(pts.first, 6.5, Paint()..color = Colors.white);
-    canvas.drawCircle(pts.first, 4.5, Paint()..color = AppColors.textDark);
 
     // Label tanggal
     for (final l in labels) {
@@ -890,26 +1092,38 @@ class _ChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _ChartPainter old) =>
       old.progress != progress ||
       old.actual != actual ||
-      old.forecast.length != forecast.length;
+      old.forecast != forecast ||
+      old.isDashedForecast != isDashedForecast;
 }
 
 // ---------- Rekomendasi aksi ----------
 class _RecommendationCard extends StatelessWidget {
-  final _Insight item;
-  const _RecommendationCard({required this.item});
+  final ProductOverview product;
+  final Forecast? forecast;
+
+  const _RecommendationCard({
+    required this.product,
+    required this.forecast,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final safe = item.daysLeft > 7;
-    final daysToDeadline = item.daysLeft - item.leadDays;
-    final deadline =
-        _fmt(DateTime.now().add(Duration(days: math.max(daysToDeadline, 0))),
-            year: true);
+    final daysLeft = forecast?.daysUntilStockout ?? product.daysUntilStockout;
+    const leadDays = 3;
 
-    final qty = TextSpan(
-      text: '${item.restockQty} ${item.unit}',
-      style: const TextStyle(
-          color: AppColors.primary, fontWeight: FontWeight.w600),
+    final bool isUrgent = (daysLeft != null && daysLeft <= leadDays) ||
+        product.currentStock <= product.reorderThreshold;
+
+    final daysToDeadline = daysLeft != null ? daysLeft - leadDays : 7;
+    final deadline = _fmt(
+        DateTime.now().add(Duration(days: math.max(daysToDeadline, 0))),
+        year: true);
+
+    final int restockQty = math.max(
+      product.reorderThreshold * 2,
+      (forecast?.avgDailyDemand != null)
+          ? (forecast!.avgDailyDemand! * 7).round()
+          : 20,
     );
 
     return SoftCard(
@@ -923,14 +1137,14 @@ class _RecommendationCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: safe ? _kGreenBg : _kBadgeBlue,
+                  color: isUrgent ? _kOrangeBg : _kGreenBg,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
-                  safe
-                      ? Icons.check_circle_outline_rounded
-                      : Icons.local_shipping_outlined,
-                  color: safe ? _kGreen : AppColors.primary,
+                  isUrgent
+                      ? Icons.local_shipping_outlined
+                      : Icons.check_circle_outline_rounded,
+                  color: isUrgent ? _kBrown : _kGreen,
                 ),
               ),
               const SizedBox(width: 14),
@@ -938,36 +1152,44 @@ class _RecommendationCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(safe ? 'KONDISI AMAN' : 'TINDAKAN DISARANKAN',
+                    Text(isUrgent ? 'TINDAKAN DISARANKAN' : 'KONDISI AMAN',
                         style: TextStyle(
                             fontSize: 12,
                             letterSpacing: 1,
                             fontWeight: FontWeight.w700,
-                            color: safe ? _kGreen : AppColors.primary)),
+                            color: isUrgent ? _kBrown : _kGreen)),
                     const SizedBox(height: 4),
-                    if (safe)
-                      Text(
-                          'Belum perlu restock. Stok diperkirakan cukup ${item.daysLeft} hari ke depan.',
-                          style: const TextStyle(
-                              fontSize: 16,
-                              height: 1.35,
-                              color: AppColors.textDark))
-                    else
+                    if (isUrgent)
                       Text.rich(
                         TextSpan(
                           style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               height: 1.35,
                               color: AppColors.textDark),
                           children: [
                             const TextSpan(text: 'Disarankan restock '),
-                            qty,
+                            TextSpan(
+                              text: '$restockQty ${product.unit}',
+                              style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700),
+                            ),
                             TextSpan(
                                 text: daysToDeadline <= 0
-                                    ? ' secepatnya.'
+                                    ? ' secepatnya (stok menipis).'
                                     : ' sebelum $deadline.'),
                           ],
                         ),
+                      )
+                    else
+                      Text(
+                        daysLeft != null
+                            ? 'Stok diperkirakan cukup hingga $daysLeft hari ke depan. Belum perlu restock.'
+                            : 'Stok saat ini aman dan berada di atas ambang batas reorder.',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.35,
+                            color: AppColors.textDark),
                       ),
                   ],
                 ),
@@ -978,6 +1200,7 @@ class _RecommendationCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
+<<<<<<< Updated upstream
               onPressed: () {
                 // TODO: buka halaman detail produk (kirim item.sku / id produk)
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -987,17 +1210,26 @@ class _RecommendationCard extends StatelessWidget {
                 );
               },
               icon: const Icon(Icons.arrow_forward_rounded, size: 22),
+=======
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailScreens(sku: product.stockCode),
+                ),
+              ),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+>>>>>>> Stashed changes
               label: const Text('Lihat Detail Produk'),
               iconAlignment: IconAlignment.end,
               style: FilledButton.styleFrom(
-                backgroundColor: safe ? AppColors.chip : AppColors.primary,
-                foregroundColor: safe ? AppColors.textDark : Colors.white,
+                backgroundColor: isUrgent ? AppColors.primary : AppColors.chip,
+                foregroundColor: isUrgent ? Colors.white : AppColors.textDark,
                 elevation: 0,
-                minimumSize: const Size.fromHeight(54),
+                minimumSize: const Size.fromHeight(50),
                 textStyle:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18)),
+                    borderRadius: BorderRadius.circular(16)),
               ),
             ),
           ),
@@ -1009,23 +1241,44 @@ class _RecommendationCard extends StatelessWidget {
 
 // ---------- Evaluasi model ----------
 class _ModelCard extends StatelessWidget {
-  final _Insight item;
-  const _ModelCard({required this.item});
+  final Forecast? forecast;
+  final String unit;
+
+  const _ModelCard({
+    required this.forecast,
+    required this.unit,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final model = forecast?.mlModel;
+
+    final String maeText =
+        model?.mae != null ? model!.mae!.toStringAsFixed(2) : '-';
+    final String rmseText =
+        model?.rmse != null ? model!.rmse!.toStringAsFixed(2) : '-';
+    final String mapeText =
+        model?.mape != null ? '${model!.mape!.toStringAsFixed(1)}%' : '-';
+
     final String quality;
     final Color qualityColor;
-    if (item.mape < 10) {
-      quality = 'akurasi tinggi';
-      qualityColor = AppColors.primary;
-    } else if (item.mape <= 20) {
-      quality = 'akurasi baik';
-      qualityColor = AppColors.primary;
+    if (model?.mape != null) {
+      if (model!.mape! <= 10) {
+        quality = 'akurasi tinggi';
+        qualityColor = _kGreen;
+      } else if (model.mape! <= 20) {
+        quality = 'akurasi baik (<20%)';
+        qualityColor = AppColors.primary;
+      } else {
+        quality = 'perlu evaluasi';
+        qualityColor = _kRedText;
+      }
     } else {
-      quality = 'perlu latih ulang';
-      qualityColor = _kRedText;
+      quality = 'belum diukur';
+      qualityColor = AppColors.textMuted;
     }
+
+    final algorithmName = model?.algorithm ?? _kDefaultAlgorithm;
 
     return SoftCard(
       padding: const EdgeInsets.all(16),
@@ -1035,53 +1288,55 @@ class _ModelCard extends StatelessWidget {
             children: [
               _MetricBox(
                 label: 'MAE',
-                value: item.mae.toStringAsFixed(2),
-                unit: item.unit,
+                value: maeText,
+                unit: unit,
               ),
               const SizedBox(width: 10),
               _MetricBox(
                 label: 'RMSE',
-                value: item.rmse.toStringAsFixed(2),
-                unit: item.unit,
+                value: rmseText,
+                unit: unit,
               ),
               const SizedBox(width: 10),
               _MetricBox(
                 label: 'MAPE',
-                value: '${item.mape.toStringAsFixed(1)}%',
+                value: mapeText,
                 unit: quality,
                 valueColor: qualityColor,
               ),
             ],
           ),
           const SizedBox(height: 14),
-          const Row(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
+              const Padding(
                 padding: EdgeInsets.only(top: 2),
                 child: Icon(Icons.info_outline_rounded,
                     size: 20, color: AppColors.textMuted),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text.rich(
                   TextSpan(
-                    style: TextStyle(
-                        fontSize: 13.5,
+                    style: const TextStyle(
+                        fontSize: 13,
                         height: 1.4,
                         color: AppColors.textMuted),
                     children: [
+                      const TextSpan(
+                          text: 'Model prediksi deret waktu: '),
                       TextSpan(
-                          text: 'Dievaluasi dari riwayat 60 hari toko. Algoritma: '),
-                      TextSpan(
-                        text: _kAlgorithm,
-                        style: TextStyle(
+                        text: algorithmName,
+                        style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             color: AppColors.textDark),
                       ),
                       TextSpan(
-                          text:
-                              ' dengan pembobotan tren hari kerja vs akhir pekan.'),
+                        text: model != null
+                            ? ' (versi ${model.version}, terlatih).'
+                            : ' (menunggu sinkronisasi dari pipeline ML).',
+                      ),
                     ],
                   ),
                 ),
@@ -1126,7 +1381,7 @@ class _MetricBox extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(value,
                   style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: valueColor)),
             ),
@@ -1135,7 +1390,7 @@ class _MetricBox extends StatelessWidget {
               fit: BoxFit.scaleDown,
               child: Text(unit,
                   style: const TextStyle(
-                      fontSize: 13, color: AppColors.textMuted)),
+                      fontSize: 12, color: AppColors.textMuted)),
             ),
           ],
         ),
