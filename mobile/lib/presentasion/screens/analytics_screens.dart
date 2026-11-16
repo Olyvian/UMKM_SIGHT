@@ -9,6 +9,7 @@ import '../../features/analytics/data/repositories/forecast_repository.dart';
 import '../../features/products/data/models/product_overview.dart';
 import '../../features/products/data/repositories/product_repository.dart';
 import '../widgets/app_shell.dart';
+import 'product_detail_screens.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kBrown = Color(0xFF9A3412);
@@ -1200,13 +1201,12 @@ class _RecommendationCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Halaman detail produk belum tersedia'),
-                  ),
-                );
-              },
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      ProductDetailScreens(sku: product.stockCode),
+                ),
+              ),
               icon: const Icon(Icons.arrow_forward_rounded, size: 22),
               label: const Text('Lihat Detail Produk'),
               iconAlignment: IconAlignment.end,
