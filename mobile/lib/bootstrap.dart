@@ -13,6 +13,7 @@ import 'app.dart';
 import 'core/config/missing_config_app.dart';
 import 'core/config/supabase_config.dart';
 import 'core/storage/session_storage.dart';
+import 'features/analytics/data/repositories/forecast_repository.dart';
 import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/dashboard/data/repositories/dashboard_repository.dart';
@@ -58,18 +59,24 @@ Future<void> bootstrap({bool resetSession = false}) async {
   final dashboardRepository = DashboardRepository(
     client: Supabase.instance.client,
   );
+  final forecastRepository = ForecastRepository(
+    client: Supabase.instance.client,
+  );
 
   runApp(
     RepositoryProvider.value(
-      value: dashboardRepository,
+      value: forecastRepository,
       child: RepositoryProvider.value(
-        value: productRepository,
+        value: dashboardRepository,
         child: RepositoryProvider.value(
-          value: authRepository,
-          child: BlocProvider(
-            create: (_) => AuthBloc(authRepository: authRepository)
-              ..add(const AuthSessionChecked()),
-            child: UmkmSightApp(startAtPasswordReset: startAtPasswordReset),
+          value: productRepository,
+          child: RepositoryProvider.value(
+            value: authRepository,
+            child: BlocProvider(
+              create: (_) => AuthBloc(authRepository: authRepository)
+                ..add(const AuthSessionChecked()),
+              child: UmkmSightApp(startAtPasswordReset: startAtPasswordReset),
+            ),
           ),
         ),
       ),
