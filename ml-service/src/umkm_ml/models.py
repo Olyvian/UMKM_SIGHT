@@ -1,8 +1,9 @@
 """Kumpulan model peramalan.
 
 Semua model memakai antarmuka (interface) yang sama:
-    model.fit(series)      -> melatih
-    model.forecast(horizon)-> np.ndarray panjang `horizon`
+    model.fit(series)                     -> melatih
+    model.forecast(horizon)               -> np.ndarray panjang `horizon`
+    model.forecast_with_ci(horizon, alpha) -> (mean, lower, upper)  masing-masing ndarray
 
 Dengan begitu pipeline bisa mengganti model tanpa mengubah kode lain.
 
@@ -15,20 +16,45 @@ Isi:
 Penting: baseline (moving average) WAJIB ada. Tujuannya pembanding.
 Kalau SARIMA tidak lebih baik dari rata-rata 7 hari, model rumit itu tidak
 layak dipakai (PRD 7.2 poin 5).
+
+Confidence Interval (CI):
+    SarimaForecaster dan SarimaTrendForecaster menghasilkan CI asli dari
+    statsmodels (95% default). Model baseline (Naive, MovingAverage,
+    SeasonalNaive) menghasilkan CI empiris sederhana berdasarkan standar
+    deviasi residual 28 hari terakhir × z-score.
 """
 
 from __future__ import annotations
 
 import warnings
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 
 from .config import MOVING_AVERAGE_WINDOW, SEASONAL_PERIOD
 
+# Jendela untuk estimasi standar deviasi residual pada model baseline.
+_RESIDUAL_WINDOW = 28
+# Z-score untuk confidence interval 95%.
+_Z_95 = 1.96
+
 
 class ModelError(RuntimeError):
     """Model gagal dilatih atau gagal memprediksi."""
+
+
+class ForecastResult(NamedTuple):
+    """Hasil forecast lengkap dengan confidence interval.
+
+    mean        : prediksi nilai tengah  (shape: horizon,)
+    lower_bound : batas bawah CI 95%     (shape: horizon,)
+    upper_bound : batas atas CI 95%      (shape: horizon,)
+    """
+
+    mean: np.ndarray
+    lower_bound: np.ndarray
+    upper_bound: np.ndarray
 
 
 class BaseForecaster:
@@ -50,6 +76,35 @@ class BaseForecaster:
 
     def forecast(self, horizon: int) -> np.ndarray:
         raise NotImplementedError
+
+    def forecast_with_ci(
+        self, horizon: int, alpha: float = 0.05
+    ) -> ForecastResult:
+        """Kembalikan (mean, lower_bound, upper_bound) untuk `horizon` hari.
+
+        Implementasi default menggunakan estimasi empiris sederhana:
+        standar deviasi residual dari `_RESIDUAL_WINDOW` hari terakhir
+        dikalikan z-score yang sesuai dengan `alpha`.
+
+        Subclass (mis. SarimaForecaster) dapat meng-override metode ini
+        dengan interval kepercayaan yang lebih akurat dari modelnya.
+        """
+        mean = self.forecast(horizon)
+        z = float(np.abs(np.percentile(
+            np.random.standard_normal(100_000), (alpha / 2) * 100
+        )))
+        # Fallback ke _Z_95 jika perhitungan gagal atau alpha tidak standar.
+        if not (0 < z < 10):
+            z = _Z_95
+
+        y = self._require_fitted()
+        window = y[-_RESIDUAL_WINDOW:] if y.size >= _RESIDUAL_WINDOW else y
+        std = float(np.std(window, ddof=1)) if window.size > 1 else 0.0
+
+        margin = z * std * np.ones(horizon)
+        lower = self._clip(mean - margin)
+        upper = mean + margin
+        return ForecastResult(mean=mean, lower_bound=lower, upper_bound=upper)
 
     # -- Helper -------------------------------------------------------------
     def _require_fitted(self) -> np.ndarray:
@@ -174,6 +229,24 @@ class SarimaForecaster(BaseForecaster):
             raise ModelError(f"SARIMA gagal memprediksi: {exc}") from exc
         return self._clip(values)
 
+    def forecast_with_ci(
+        self, horizon: int, alpha: float = 0.05
+    ) -> ForecastResult:
+        """Gunakan interval kepercayaan asli dari statsmodels (lebih akurat)."""
+        if self._result is None:
+            raise ModelError("SARIMA belum dilatih.")
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                fc = self._result.get_forecast(steps=horizon)
+                mean = self._clip(np.asarray(fc.predicted_mean, dtype=float))
+                ci = fc.conf_int(alpha=alpha)
+                lower = self._clip(np.asarray(ci.iloc[:, 0], dtype=float))
+                upper = np.asarray(ci.iloc[:, 1], dtype=float)
+        except Exception as exc:  # noqa: BLE001
+            raise ModelError(f"SARIMA gagal menghasilkan CI: {exc}") from exc
+        return ForecastResult(mean=mean, lower_bound=lower, upper_bound=upper)
+
 
 class SarimaTrendForecaster(SarimaForecaster):
     """SARIMA dengan diferensiasi: menangani tren naik/turun.
@@ -192,6 +265,7 @@ class SarimaTrendForecaster(SarimaForecaster):
 
     def __init__(self) -> None:
         super().__init__(order=(1, 1, 1), seasonal_order=(0, 1, 1, SEASONAL_PERIOD))
+    # forecast_with_ci diwarisi dari SarimaForecaster (pakai statsmodels CI).
 
 
 def default_models() -> list[BaseForecaster]:
