@@ -10,6 +10,9 @@ statsmodels>=0.14
 matplotlib>=3.8
 pytest>=7.4
 
+# Sinkronisasi hasil pipeline ke Supabase (modul supabase_sync)
+supabase>=2.0
+
 # Opsional - untuk tahap berikutnya (REST API layanan prediksi)
 # fastapi>=0.110
 # uvicorn>=0.29

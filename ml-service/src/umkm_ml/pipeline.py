@@ -262,7 +262,14 @@ def run_product(
 
     # --- 3. Latih ulang model terbaik pada seluruh data -------------------
     best_model = create_model(evaluation.best_name).fit(series)
-    future_values = best_model.forecast(horizon)
+
+    # Ambil prediksi + confidence interval 95%.
+    # forecast_with_ci tersedia di semua model: CI asli dari statsmodels untuk
+    # SARIMA/SarimaTrend, CI empiris (std residual) untuk baseline.
+    fc_result = best_model.forecast_with_ci(horizon, alpha=0.05)
+    future_values = fc_result.mean
+    future_lower = fc_result.lower_bound
+    future_upper = fc_result.upper_bound
 
     last_date = series.index.max()
     future_dates = pd.date_range(
@@ -270,8 +277,16 @@ def run_product(
     )
 
     # --- 4. Estimasi stok habis -------------------------------------------
+    # Gunakan batas ATAS (skenario permintaan tinggi) untuk stok-habis yang
+    # lebih konservatif, sekaligus tetap simpan skenario rata-rata.
     stockout = estimate_stockout(
         daily_forecast=list(future_values),
+        current_stock=current_stock,
+        start_date=future_dates[0].date(),
+        lead_time_days=lead_time_days,
+    )
+    stockout_pessimistic = estimate_stockout(
+        daily_forecast=list(future_upper),
         current_stock=current_stock,
         start_date=future_dates[0].date(),
         lead_time_days=lead_time_days,
@@ -308,11 +323,20 @@ def run_product(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "horizon_days": horizon,
         "history_last_date": last_date.date().isoformat(),
+        "confidence_level": 0.95,
         "predictions": [
-            {"date": d.date().isoformat(), "predicted_qty": round(float(v), 3)}
-            for d, v in zip(future_dates, future_values)
+            {
+                "date": d.date().isoformat(),
+                "predicted_qty": round(float(v), 3),
+                "lower_bound": round(float(lo), 3),
+                "upper_bound": round(float(hi), 3),
+            }
+            for d, v, lo, hi in zip(
+                future_dates, future_values, future_lower, future_upper
+            )
         ],
         "stockout": stockout.to_dict(),
+        "stockout_pessimistic": stockout_pessimistic.to_dict(),
     }
     forecast_path.write_text(json.dumps(forecast_payload, indent=2), encoding="utf-8")
     files.append(_rel(forecast_path))
@@ -348,8 +372,15 @@ def run_product(
         model_scores=[_score_to_dict(s) for s in evaluation.scores],
         accuracy_by_horizon=horizon_report(evaluation),
         forecast=[
-            {"date": d.date().isoformat(), "predicted_qty": round(float(v), 3)}
-            for d, v in zip(future_dates, future_values)
+            {
+                "date": d.date().isoformat(),
+                "predicted_qty": round(float(v), 3),
+                "lower_bound": round(float(lo), 3),
+                "upper_bound": round(float(hi), 3),
+            }
+            for d, v, lo, hi in zip(
+                future_dates, future_values, future_lower, future_upper
+            )
         ],
         stockout=stockout,
         artifact_files=files,
