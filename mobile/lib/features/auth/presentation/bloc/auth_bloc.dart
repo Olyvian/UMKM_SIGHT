@@ -19,16 +19,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   final AuthRepository _authRepository;
 
+  static const _unexpectedError = 'Terjadi kesalahan tak terduga. Coba lagi.';
+
   Future<void> _onSessionChecked(
     AuthSessionChecked event,
     Emitter<AuthState> emit,
   ) async {
-    final user = await _authRepository.restoreSession();
-    if (user != null) {
-      emit(AuthState(status: AuthStatus.authenticated, user: user));
-    } else {
-      emit(const AuthState(status: AuthStatus.unauthenticated));
+    try {
+      final user = await _authRepository.restoreSession();
+      if (user != null) {
+        emit(AuthState(status: AuthStatus.authenticated, user: user));
+        return;
+      }
+    } catch (_) {
+      // Sesi tidak dapat dipulihkan: perlakukan sebagai belum login.
     }
+    emit(const AuthState(status: AuthStatus.unauthenticated));
   }
 
   Future<void> _onLoginRequested(
@@ -42,11 +48,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
       );
       emit(AuthState(status: AuthStatus.authenticated, user: user));
-    } on AuthException catch (e) {
+    } on AuthFailure catch (e) {
+      emit(AuthState(status: AuthStatus.unauthenticated, errorMessage: e.message));
+    } catch (_) {
       emit(
-        AuthState(
+        const AuthState(
           status: AuthStatus.unauthenticated,
-          errorMessage: e.message,
+          errorMessage: _unexpectedError,
         ),
       );
     }
@@ -65,11 +73,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
       );
       emit(AuthState(status: AuthStatus.authenticated, user: user));
-    } on AuthException catch (e) {
+    } on AuthFailure catch (e) {
+      emit(AuthState(status: AuthStatus.unauthenticated, errorMessage: e.message));
+    } catch (_) {
       emit(
-        AuthState(
+        const AuthState(
           status: AuthStatus.unauthenticated,
-          errorMessage: e.message,
+          errorMessage: _unexpectedError,
         ),
       );
     }

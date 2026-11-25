@@ -17,12 +17,15 @@ dependencies:
   flutter_bloc: ^8.1.6
   equatable: ^2.0.7
 
-  # Jaringan & penyimpanan lokal
-  dio: ^5.7.0
+  # Backend (PostgreSQL + Auth) & penyimpanan lokal
+  supabase_flutter: ^2.18.3
   shared_preferences: ^2.3.2
+  # Tautan reset kata sandi dari email (sudah ikut supabase_flutter)
+  app_links: ^7.2.2
 
   # UI
   google_fonts: ^6.2.1
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

@@ -4,8 +4,10 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
 import '../../presentasion/screens/home_screens.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 
@@ -13,21 +15,26 @@ abstract final class AppRoutes {
   static const splash = '/splash';
   static const login = '/login';
   static const register = '/register';
+  static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
   static const dashboard = '/dashboard';
 }
 
 /// Router aplikasi. Perpindahan halaman mengikuti status [AuthBloc]:
 ///
 /// - Saat dibuka, Splash memeriksa sesi tersimpan (status `unknown`).
-/// - Belum login: hanya Login & Register yang boleh dibuka; halaman lain
-///   (termasuk yang ditambahkan nanti) otomatis dialihkan ke Login.
+/// - Belum login: hanya Login, Register, dan Lupa Kata Sandi yang boleh
+///   dibuka; halaman lain (termasuk yang ditambahkan nanti) otomatis
+///   dialihkan ke Login.
 /// - Sudah login (sesi masih tersimpan): langsung ke Dashboard; Login,
-///   Register, dan Splash tidak dapat dibuka lagi.
+///   Register, Lupa Kata Sandi, dan Splash tidak dapat dibuka lagi.
+/// - Halaman atur kata sandi baru (`/reset-password`) selalu boleh dibuka:
+///   halaman itu yang memeriksa sendiri apakah sesi pemulihan masih ada.
 class AppRouter {
-  AppRouter(this._authBloc) {
+  AppRouter(this._authBloc, {String initialLocation = AppRoutes.splash}) {
     _refresh = _GoRouterRefreshStream(_authBloc.stream);
     router = GoRouter(
-      initialLocation: AppRoutes.splash,
+      initialLocation: initialLocation,
       refreshListenable: _refresh,
       redirect: _redirect,
       routes: [
@@ -44,6 +51,14 @@ class AppRouter {
           builder: (context, state) => const RegisterPage(),
         ),
         GoRoute(
+          path: AppRoutes.forgotPassword,
+          builder: (context, state) => const ForgotPasswordPage(),
+        ),
+        GoRoute(
+          path: AppRoutes.resetPassword,
+          builder: (context, state) => const ResetPasswordPage(),
+        ),
+        GoRoute(
           path: AppRoutes.dashboard,
           builder: (context, state) => const HomeScreens(),
         ),
@@ -57,14 +72,22 @@ class AppRouter {
 
   String? _redirect(BuildContext context, GoRouterState state) {
     final location = state.matchedLocation;
-    const publicRoutes = {AppRoutes.login, AppRoutes.register};
+    // Sesi pemulihan kata sandi bukan Login biasa: jangan dialihkan ke
+    // Dashboard sebelum pengguna menyimpan kata sandi baru.
+    if (location == AppRoutes.resetPassword) return null;
+
+    const publicRoutes = {
+      AppRoutes.login,
+      AppRoutes.register,
+      AppRoutes.forgotPassword,
+    };
 
     switch (_authBloc.state.status) {
       case AuthStatus.unknown:
         return location == AppRoutes.splash ? null : AppRoutes.splash;
       case AuthStatus.authenticated:
-        final isGate = publicRoutes.contains(location) ||
-            location == AppRoutes.splash;
+        final isGate =
+            publicRoutes.contains(location) || location == AppRoutes.splash;
         return isGate ? AppRoutes.dashboard : null;
       case AuthStatus.unauthenticated:
         // Default-deny: selain Login/Register, semua halaman wajib login.
