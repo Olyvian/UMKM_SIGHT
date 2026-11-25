@@ -11,19 +11,32 @@ import '../widgets/stock_in_sheet.dart';
 
 // ---------- Warna tambahan khusus halaman ini ----------
 const _kOutFg = Color(0xFFB91C1C);
-const _kOutBg = Color(0xFFFEE2E2);
 const _kInFg = Color(0xFF1D4ED8);
-const _kInBg = Color(0xFFDDE5FF);
-const _kChipActiveBg = Color(0xFFE0E7FF);
 const _kBox = Color(0xFFEFF2FB);
 
 // ---------- Helper tanggal ----------
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 const _weekdays = [
-  'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+  'Senin',
+  'Selasa',
+  'Rabu',
+  'Kamis',
+  'Jumat',
+  'Sabtu',
+  'Minggu',
 ];
 
 String _fmtDate(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
@@ -188,7 +201,8 @@ class _TransactionScreensState extends State<TransactionScreens> {
 
       final productId = result.product.id;
       if (productId == null) {
-        _showMessage('Produk tidak dikenali. Muat ulang halaman.', isError: true);
+        _showMessage('Produk tidak dikenali. Muat ulang halaman.',
+            isError: true);
         return;
       }
 
@@ -244,7 +258,8 @@ class _TransactionScreensState extends State<TransactionScreens> {
 
       final productId = result.product.id;
       if (productId == null) {
-        _showMessage('Produk tidak dikenali. Muat ulang halaman.', isError: true);
+        _showMessage('Produk tidak dikenali. Muat ulang halaman.',
+            isError: true);
         return;
       }
 
@@ -279,7 +294,7 @@ class _TransactionScreensState extends State<TransactionScreens> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -304,9 +319,8 @@ class _TransactionScreensState extends State<TransactionScreens> {
                   final allTx = snapshot.data ?? const <_Tx>[];
                   final query = _searchCtrl.text.trim().toLowerCase();
 
-                  final todayOut = allTx
-                      .where((t) => t.isOut && t.daysAgo == 0)
-                      .length;
+                  final todayOut =
+                      allTx.where((t) => t.isOut && t.daysAgo == 0).length;
                   final weekIn = allTx
                       .where((t) => !t.isOut && t.daysAgo >= 0 && t.daysAgo < 7)
                       .length;
@@ -337,18 +351,18 @@ class _TransactionScreensState extends State<TransactionScreens> {
                       ),
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                       children: [
                         _Header(
                           onExport: () =>
                               _showMessage('Ekspor riwayat belum tersedia'),
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 12),
                         _ActionRow(
                           onSale: _openSaleEntry,
                           onStockIn: _openStockIn,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         IntrinsicHeight(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -360,11 +374,12 @@ class _TransactionScreensState extends State<TransactionScreens> {
                                   unit: 'transaksi',
                                   caption: 'Total barang terjual',
                                   icon: Icons.north_east_rounded,
-                                  iconBg: _kOutBg,
-                                  iconFg: _kOutFg,
+                                  iconBg: AppColors.dangerBgOf(context),
+                                  iconFg: AppColors.dangerOf(context),
+                                  valueColor: AppColors.dangerOf(context),
                                 ),
                               ),
-                              const SizedBox(width: 14),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: _SummaryCard(
                                   label: 'Barang masuk minggu ini',
@@ -372,19 +387,20 @@ class _TransactionScreensState extends State<TransactionScreens> {
                                   unit: 'pengiriman',
                                   caption: 'Pasokan inventaris',
                                   icon: Icons.south_west_rounded,
-                                  iconBg: _kInBg,
-                                  iconFg: _kInFg,
+                                  iconBg: AppColors.successBgOf(context),
+                                  iconFg: AppColors.successOf(context),
+                                  valueColor: AppColors.successOf(context),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         _SearchField(
                           controller: _searchCtrl,
                           onChanged: (_) => setState(() {}),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
                         _FilterRow(
                           type: _type,
                           last30: _last30,
@@ -437,32 +453,33 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Transaksi',
                   style: TextStyle(
-                      fontSize: 32,
-                      height: 1.15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark)),
-              SizedBox(height: 2),
+                      fontSize: 20,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimaryOf(context))),
+              const SizedBox(height: 2),
               Text('Riwayat keluar masuk persediaan barang',
-                  style: TextStyle(fontSize: 14, color: AppColors.textMuted)),
+                  style: TextStyle(
+                      fontSize: 14, color: AppColors.textSecondaryOf(context))),
             ],
           ),
         ),
         const SizedBox(width: 12),
         SoftCard(
           onTap: onExport,
-          radius: 16,
+          radius: 6,
           padding: EdgeInsets.zero,
-          child: const SizedBox(
-            width: 50,
-            height: 50,
+          child: SizedBox(
+            width: 36,
+            height: 36,
             child: Icon(Icons.file_download_outlined,
-                color: AppColors.textDark, size: 24),
+                color: AppColors.textPrimaryOf(context), size: 18),
           ),
         ),
       ],
@@ -477,58 +494,47 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secondaryBg = AppColors.surfaceSecondaryOf(context);
+    final textPrimary = AppColors.textPrimaryOf(context);
+
     return Row(
       children: [
         Expanded(
-          child: SoftCard(
-            onTap: onSale,
-            radius: 20,
-            padding: const EdgeInsets.symmetric(vertical: 17),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.receipt_long_outlined,
-                    size: 22, color: AppColors.textDark),
-                SizedBox(width: 8),
-                Flexible(
-                  child: FittedBox(
-                    child: Text('Catat Penjualan',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textDark)),
-                  ),
+          child: Material(
+            color: secondaryBg,
+            borderRadius: BorderRadius.circular(6),
+            child: InkWell(
+              onTap: onSale,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Center(
+                  child: Text('Catat Penjualan',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: textPrimary)),
                 ),
-              ],
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 8),
         Expanded(
           child: Material(
             color: AppColors.primary,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(6),
             child: InkWell(
               onTap: onStockIn,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(6),
               child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 17),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_circle_outline_rounded,
-                        size: 22, color: Colors.white),
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: FittedBox(
-                        child: Text('Stok Masuk',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white)),
-                      ),
-                    ),
-                  ],
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Center(
+                  child: Text('Stok Masuk',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white)),
                 ),
               ),
             ),
@@ -543,7 +549,7 @@ class _ActionRow extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   final String label, value, unit, caption;
   final IconData icon;
-  final Color iconBg, iconFg;
+  final Color iconBg, iconFg, valueColor;
 
   const _SummaryCard({
     required this.label,
@@ -553,12 +559,16 @@ class _SummaryCard extends StatelessWidget {
     required this.icon,
     required this.iconBg,
     required this.iconFg,
+    required this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final textMuted = AppColors.textSecondaryOf(context);
+    final hint = AppColors.textHintOf(context);
+
     return SoftCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -567,45 +577,31 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 14, height: 1.3, color: AppColors.textMuted)),
+                    style:
+                        TextStyle(fontSize: 12, height: 1.3, color: textMuted)),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
-                width: 34,
-                height: 34,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: iconBg,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(icon, size: 18, color: iconFg),
+                child: Icon(icon, size: 15, color: iconFg),
               ),
             ],
           ),
           const Spacer(),
-          const SizedBox(height: 12),
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                    text: value,
-                    style: const TextStyle(
-                        fontSize: 36,
-                        height: 1.1,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
-                TextSpan(
-                    text: ' $unit',
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textMuted)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(caption,
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 20,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor)),
+          const SizedBox(height: 2),
+          Text(caption, style: TextStyle(fontSize: 12, color: hint)),
         ],
       ),
     );
@@ -622,36 +618,35 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 14, offset: Offset(0, 4)),
-        ],
+        color: AppColors.surfaceOf(context),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.borderOf(context), width: 1),
       ),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
         textInputAction: TextInputAction.search,
-        cursorColor: AppColors.primary,
-        style: const TextStyle(fontSize: 17, color: AppColors.textDark),
+        cursorColor: AppColors.primaryOf(context),
+        style: TextStyle(fontSize: 14, color: AppColors.textPrimaryOf(context)),
         decoration: InputDecoration(
           hintText: 'Cari riwayat transaksi...',
-          hintStyle: const TextStyle(fontSize: 17, color: AppColors.hint),
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: AppColors.textMuted, size: 26),
+          hintStyle:
+              TextStyle(fontSize: 14, color: AppColors.textHintOf(context)),
+          prefixIcon: Icon(Icons.search_rounded,
+              color: AppColors.textSecondaryOf(context), size: 18),
           suffixIcon: controller.text.isEmpty
               ? null
               : IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: AppColors.textMuted, size: 22),
+                  icon: Icon(Icons.close_rounded,
+                      color: AppColors.textSecondaryOf(context), size: 18),
                   onPressed: () {
                     controller.clear();
                     onChanged('');
                   },
                 ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 18),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 11),
         ),
       ),
     );
@@ -680,7 +675,8 @@ class _FilterRow extends StatelessWidget {
       clipBehavior: Clip.none,
       child: Row(
         children: [
-          _Chip(label: 'Semua', active: type == null, onTap: () => onType(null)),
+          _Chip(
+              label: 'Semua', active: type == null, onTap: () => onType(null)),
           const SizedBox(width: 10),
           _Chip(
               label: 'Barang keluar',
@@ -717,35 +713,34 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = active ? AppColors.primary : AppColors.textMuted;
+    final bg = active
+        ? AppColors.primaryTintOf(context)
+        : AppColors.surfaceSecondaryOf(context);
+    final fg = active
+        ? AppColors.primaryOf(context)
+        : AppColors.textSecondaryOf(context);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? _kChipActiveBg : AppColors.surface,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: active
-              ? null
-              : const [
-                  BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 8,
-                      offset: Offset(0, 2)),
-                ],
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: 6),
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: 5),
             ],
             Text(label,
                 style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
                     color: fg)),
           ],
         ),
@@ -762,20 +757,21 @@ class _GroupHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = AppColors.textSecondaryOf(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Row(
         children: [
           Expanded(
             child: Text(label,
-                style: const TextStyle(
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textMuted)),
+                style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 0.6,
+                    fontWeight: FontWeight.w600,
+                    color: muted)),
           ),
           Text('$count aktivitas',
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 12, color: muted)),
         ],
       ),
     );
@@ -790,7 +786,14 @@ class _TxCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = tx.isOut ? _kOutFg : _kInFg;
+    final fg =
+        tx.isOut ? AppColors.dangerOf(context) : AppColors.successOf(context);
+    final iconBg = tx.isOut
+        ? AppColors.dangerBgOf(context)
+        : AppColors.successBgOf(context);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final chipBg = AppColors.surfaceSecondaryOf(context);
     final soldOut = tx.stockAfter == 0;
 
     return SoftCard(
@@ -799,18 +802,19 @@ class _TxCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: tx.isOut ? AppColors.chip : _kInBg,
-              borderRadius: BorderRadius.circular(16),
+              color: iconBg,
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
               tx.isOut ? Icons.north_east_rounded : Icons.south_west_rounded,
               color: fg,
+              size: 18,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -822,53 +826,49 @@ class _TxCard extends StatelessWidget {
                       child: Text(tx.product,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textDark)),
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: textPrimary)),
                     ),
                     const SizedBox(width: 8),
                     Text('${tx.isOut ? '-' : '+'}${tx.qty} ${tx.unit}',
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: fg)),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 3),
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: tx.isOut ? AppColors.chip : _kInBg,
-                        borderRadius: BorderRadius.circular(8),
+                        color: tx.isOut ? chipBg : iconBg,
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
-                          tx.isOut ? 'Barang Keluar' : 'Barang Masuk',
+                      child: Text(tx.isOut ? 'Barang Keluar' : 'Barang Masuk',
                           style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: tx.isOut
-                                  ? const Color(0xFF334155)
-                                  : _kInFg)),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: tx.isOut ? textMuted : fg)),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Text(_fmtTime(tx.dateTime),
-                        style: const TextStyle(
-                            fontSize: 14, color: AppColors.textMuted)),
+                        style: TextStyle(fontSize: 12, color: textMuted)),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 if (soldOut)
                   Row(
                     children: [
                       Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                            color: _kOutFg, shape: BoxShape.circle),
+                        width: 6,
+                        height: 6,
+                        decoration:
+                            BoxDecoration(color: fg, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 6),
                       Text('Sisa stok: 0 ${tx.unit} (Habis)',
@@ -902,7 +902,8 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: Column(
         children: [
-          const Icon(Icons.receipt_long_outlined, size: 44, color: AppColors.hint),
+          const Icon(Icons.receipt_long_outlined,
+              size: 44, color: AppColors.hint),
           const SizedBox(height: 10),
           Text(message,
               style: const TextStyle(fontSize: 16, color: AppColors.textMuted)),
@@ -1017,7 +1018,8 @@ void _showDetail(BuildContext context, _Tx tx) {
 class _DetailRow extends StatelessWidget {
   final String label, value;
   final bool last;
-  const _DetailRow({required this.label, required this.value, this.last = false});
+  const _DetailRow(
+      {required this.label, required this.value, this.last = false});
 
   @override
   Widget build(BuildContext context) {

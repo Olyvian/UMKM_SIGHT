@@ -10,11 +10,11 @@ import '../screens/profile_screens.dart';
 import '../screens/transaction_screens.dart';
 
 // =====================================================================
-// Widget bersama untuk semua halaman utama.
+// Widget bersama untuk semua halaman utama (Figma "Rapi & Padat" + Dark Mode).
 // Simpan di: lib/presentasion/widgets/app_shell.dart
 // =====================================================================
 
-/// Kartu putih dengan bayangan lembut dan efek ripple saat disentuh.
+/// Kartu dengan garis tepi crisp (radius 6px sesuai Figma) & adaptif Dark Mode.
 class SoftCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -24,25 +24,22 @@ class SoftCard extends StatelessWidget {
   const SoftCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(14),
-    this.radius = 24,
+    this.padding = const EdgeInsets.all(12),
+    this.radius = 6,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: surfaceColor,
         borderRadius: r,
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 14,
-            offset: Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -57,175 +54,223 @@ class SoftCard extends StatelessWidget {
   }
 }
 
-/// Bar atas: logo toko, nama toko, lonceng notifikasi, dan avatar.
+/// Bar atas sesuai komponen `C / TopBar` di Figma:
+/// Kotak logo toko, label "TOKO UMKM", nama toko, lonceng, dan avatar inisial.
 class AppTopBar extends StatelessWidget {
   const AppTopBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final storeName =
-        context.select((AuthBloc bloc) => bloc.state.user?.store?.storeName);
+    final user = context.select((AuthBloc bloc) => bloc.state.user);
+    final storeName = user?.store?.storeName;
     final title = (storeName == null || storeName.trim().isEmpty)
         ? 'Toko Saya'
         : storeName;
+    final initial = (user?.name.trim().isNotEmpty ?? false)
+        ? user!.name.trim()[0].toUpperCase()
+        : 'O';
+
+    final surfaceColor = AppColors.surfaceOf(context);
+    final secondaryBg = AppColors.surfaceSecondaryOf(context);
+    final textColor = AppColors.textPrimaryOf(context);
+    final mutedColor = AppColors.textSecondaryOf(context);
+    final borderColor = AppColors.borderOf(context);
+    final primaryColor = AppColors.primaryOf(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FB),
-              borderRadius: BorderRadius.circular(16),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: secondaryBg,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.storefront_rounded,
+                color: primaryColor,
+                size: 20,
+              ),
             ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'TOKO UMKM',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textMuted,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'TOKO UMKM',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.8,
+                      color: mutedColor,
+                      height: 1.4,
+                    ),
                   ),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.notifications_none_rounded,
+                color: mutedColor,
+                size: 20,
+              ),
+              onPressed: () {},
+              tooltip: 'Notifikasi',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const ProfileScreens(),
+                    transitionDuration: Duration.zero,
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                alignment: Alignment.center,
+                child: Text(
+                  initial,
                   style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-          const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.textMuted,
-            size: 28,
-          ),
-          const SizedBox(width: 18),
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreens()),
-            ),
-            child: const CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primary,
-              child: Icon(Icons.person_outline_rounded, color: Colors.white),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Navigasi bawah. Cukup panggil `AppBottomNav(current: n)` di tiap halaman:
-/// 0 = Beranda, 1 = Produk, 2 = Transaksi, 3 = Analitik.
+/// Navigation Bar bawah sesuai Figma (`C / BottomNav`).
 class AppBottomNav extends StatelessWidget {
-  final int current;
-  const AppBottomNav({super.key, required this.current});
+  final int currentIndex;
 
-  void _go(BuildContext context, int target) {
-    if (target == current) return;
+  const AppBottomNav({
+    super.key,
+    int? currentIndex,
+    int? current,
+  }) : currentIndex = currentIndex ?? current ?? 0;
 
-    final Widget? page = switch (target) {
-      0 => const HomeScreens(),
-      1 => const ProductScreens(),
-      2 => const TransactionScreens(),
-      3 => const AnalyticsScreens(),
-      _ => null, // tab lain belum tersedia
-    };
+  void _onItemTapped(BuildContext context, int index) {
+    if (index == currentIndex) return;
 
-    if (page == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Halaman ini belum tersedia')),
-      );
-      return;
+    final Widget page;
+    switch (index) {
+      case 0:
+        page = const HomeScreens();
+        break;
+      case 1:
+        page = const ProductScreens();
+        break;
+      case 2:
+        page = const TransactionScreens();
+        break;
+      case 3:
+        page = const AnalyticsScreens();
+        break;
+      default:
+        return;
     }
 
-    // Tanpa animasi supaya terasa seperti berpindah tab.
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => page,
         transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 16,
-            offset: Offset(0, -4),
-          ),
-        ],
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
+    final unselectedColor = AppColors.textSecondaryOf(context);
+    final activeColor = AppColors.primaryOf(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border(top: BorderSide(color: borderColor, width: 1)),
       ),
-      child: BottomNavigationBar(
-        currentIndex: current,
-        onTap: (i) => _go(context, i),
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textMuted,
-        selectedFontSize: 13,
-        unselectedFontSize: 13,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
-            label: 'Beranda',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            activeIcon: Icon(Icons.inventory_2_rounded),
-            label: 'Produk',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long_outlined),
-            activeIcon: Icon(Icons.receipt_long_rounded),
-            label: 'Transaksi',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.show_chart),
-            label: 'Analitik',
-          ),
-        ],
+      child: SafeArea(
+        top: false,
+        child: NavigationBar(
+          height: 64,
+          selectedIndex: currentIndex,
+          onDestinationSelected: (i) => _onItemTapped(context, i),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          indicatorColor: activeColor.withValues(alpha: 0.12),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined, color: unselectedColor, size: 20),
+              selectedIcon:
+                  Icon(Icons.home_rounded, color: activeColor, size: 20),
+              label: 'Beranda',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined,
+                  color: unselectedColor, size: 20),
+              selectedIcon:
+                  Icon(Icons.inventory_2_rounded, color: activeColor, size: 20),
+              label: 'Produk',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined,
+                  color: unselectedColor, size: 20),
+              selectedIcon: Icon(Icons.receipt_long_rounded,
+                  color: activeColor, size: 20),
+              label: 'Transaksi',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_outlined,
+                  color: unselectedColor, size: 20),
+              selectedIcon:
+                  Icon(Icons.bar_chart_rounded, color: activeColor, size: 20),
+              label: 'Analitik',
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -26,8 +26,18 @@ const _kDefaultAlgorithm = 'ARIMA (Autoregressive Integrated Moving Average)';
 
 // ---------- Helper tanggal ----------
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
 String _fmt(DateTime d, {bool year = false}) =>
@@ -120,7 +130,8 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
     try {
       final forecastRepo = context.read<ForecastRepository>();
       final forecast = await forecastRepo.fetchLatestForecast(product.id);
-      final actual = await forecastRepo.fetchRecentDailySales(product.id, days: 7);
+      final actual =
+          await forecastRepo.fetchRecentDailySales(product.id, days: 7);
 
       if (!mounted) return;
 
@@ -186,7 +197,8 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
                           style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               color: AppColors.textDark)),
-                      subtitle: Text('SKU: ${p.stockCode} • Stok: ${p.currentStock} ${p.unit}'),
+                      subtitle: Text(
+                          'SKU: ${p.stockCode} • Stok: ${p.currentStock} ${p.unit}'),
                       trailing: i == _productIdx
                           ? const Icon(Icons.check_circle_rounded,
                               color: AppColors.primary)
@@ -211,7 +223,7 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -255,14 +267,16 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                style:
+                    const TextStyle(fontSize: 13, color: AppColors.textMuted),
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: _loadData,
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Coba Lagi'),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
               ),
             ],
           ),
@@ -304,7 +318,8 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: _loadData,
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
                 child: const Text('Segarkan'),
               ),
             ],
@@ -320,20 +335,20 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           const _PageHeader(),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           _ProductSelector(
             product: currentProduct,
             onTap: _pickProduct,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _StatusCard(
             product: currentProduct,
             forecast: _currentForecast,
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
           _SectionTitle(
             title: 'Proyeksi Permintaan',
             subtitle: 'Tren aktual & peramalan ARIMA ke depan',
@@ -350,14 +365,14 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
             horizon: _horizon,
             isLoading: _loadingForecast,
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
           const _SectionTitle(title: 'Rekomendasi Aksi'),
           const SizedBox(height: 14),
           _RecommendationCard(
             product: currentProduct,
             forecast: _currentForecast,
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
           const _SectionTitle(
             title: 'Evaluasi Model ML',
             trailing: Row(
@@ -367,8 +382,7 @@ class _AnalyticsScreensState extends State<AnalyticsScreens> {
                     size: 18, color: AppColors.textMuted),
                 SizedBox(width: 6),
                 Text('Terkalibrasi',
-                    style: TextStyle(
-                        fontSize: 14, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 14, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -389,39 +403,41 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = AppColors.primaryOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _kBadgeBlue,
-            borderRadius: BorderRadius.circular(20),
+            color: AppColors.primaryTintOf(context),
+            borderRadius: BorderRadius.circular(6),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_graph_rounded,
-                  size: 16, color: AppColors.primary),
-              SizedBox(width: 6),
+              Icon(Icons.auto_graph_rounded, size: 14, color: primary),
+              const SizedBox(width: 6),
               Text('Kecerdasan Stok UMKM',
                   style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary)),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                      color: primary)),
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        const Text('Analitik & Prediksi',
+        const SizedBox(height: 8),
+        Text('Analitik & Prediksi',
             style: TextStyle(
-                fontSize: 30,
-                height: 1.15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark)),
-        const SizedBox(height: 4),
-        const Text('Proyeksi kebutuhan stok berbasis model time-series ARIMA',
-            style: TextStyle(fontSize: 14, color: AppColors.textMuted)),
+                fontSize: 20,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimaryOf(context))),
+        const SizedBox(height: 3),
+        Text('Proyeksi stok berbasis model ARIMA',
+            style: TextStyle(
+                fontSize: 14, color: AppColors.textSecondaryOf(context))),
       ],
     );
   }
@@ -435,23 +451,26 @@ class _ProductSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final primary = AppColors.primaryOf(context);
+
     return SoftCard(
       onTap: onTap,
-      radius: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      radius: 6,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppColors.chip,
-              borderRadius: BorderRadius.circular(14),
+              color: AppColors.surfaceSecondaryOf(context),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: const Icon(Icons.inventory_2_outlined,
-                color: AppColors.primary),
+            child: Icon(Icons.inventory_2_outlined, color: primary, size: 18),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,19 +478,18 @@ class _ProductSelector extends StatelessWidget {
                 Text(product.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textDark)),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: textPrimary)),
                 const SizedBox(height: 2),
-                Text('SKU: ${product.stockCode} • ${product.category ?? "Umum"}',
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textMuted)),
+                Text(
+                    'SKU: ${product.stockCode}  •  ${product.category ?? "Umum"}',
+                    style: TextStyle(fontSize: 12, color: textMuted)),
               ],
             ),
           ),
-          const Icon(Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textMuted),
+          Icon(Icons.keyboard_arrow_down_rounded, color: textMuted, size: 18),
         ],
       ),
     );
@@ -489,6 +507,9 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final daysLeft = forecast?.daysUntilStockout ?? product.daysUntilStockout;
     final p = _priority(daysLeft);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final secondaryBg = AppColors.surfaceSecondaryOf(context);
 
     final String daysText;
     final String captionText;
@@ -499,68 +520,66 @@ class _StatusCard extends StatelessWidget {
       daysText = 'Hari ini';
       captionText = 'Stok habis';
     } else {
-      daysText = '$daysLeft Hari';
+      daysText = '$daysLeft hari';
       final out = DateTime.now().add(Duration(days: daysLeft));
       captionText = 'Prediksi: ${_fmt(out, year: true)}';
     }
 
     return SoftCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: p.fg, size: 26),
-              const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text('Status Ketahanan Stok',
                     style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary)),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: p.bg,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(p.label,
                     style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.2,
                         color: p.fg)),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: _InfoBox(
-                    color: _kBox,
+                    color: secondaryBg,
                     caption: 'Stok saat ini',
                     value: '${product.currentStock}',
                     suffix: ' ${product.unit}',
-                    valueColor: AppColors.textDark,
-                    footer: 'Ambang batas: ${product.reorderThreshold} ${product.unit}',
-                    footerColor: AppColors.textMuted,
+                    valueColor: textPrimary,
+                    footer:
+                        'Ambang: ${product.reorderThreshold} ${product.unit}',
+                    footerColor: textMuted,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _InfoBox(
-                    color: p.bg.withAlpha(110),
-                    caption: captionText,
+                    color: secondaryBg,
+                    caption: 'Estimasi habis',
                     value: daysText,
-                    suffix: (daysLeft != null && daysLeft > 0) ? ' lagi' : '',
+                    suffix: '',
                     valueColor: p.fg,
-                    footer: daysLeft == null ? 'Tidak perlu restock' : 'Estimasi habis total',
-                    footerColor: p.fg,
-                    footerBold: true,
+                    footer: captionText,
+                    footerColor: textMuted,
                   ),
                 ),
               ],
@@ -585,45 +604,41 @@ class _InfoBox extends StatelessWidget {
     required this.valueColor,
     required this.footer,
     required this.footerColor,
-    this.footerBold = false,
-  });
+  }) : footerBold = false;
 
   @override
   Widget build(BuildContext context) {
+    final textMuted = AppColors.textSecondaryOf(context);
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(caption,
-              style:
-                  const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-          const SizedBox(height: 6),
+          Text(caption, style: TextStyle(fontSize: 12, color: textMuted)),
+          const SizedBox(height: 2),
           Text.rich(
             TextSpan(
               children: [
                 TextSpan(
                     text: value,
                     style: TextStyle(
-                        fontSize: 26,
-                        height: 1.1,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                         color: valueColor)),
                 TextSpan(
                     text: suffix,
-                    style: const TextStyle(
-                        fontSize: 14, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 12, color: textMuted)),
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 2),
           Text(footer,
               style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: footerBold ? FontWeight.w600 : FontWeight.w400,
                   color: footerColor)),
         ],
@@ -649,15 +664,16 @@ class _SectionTitle extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style: const TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark)),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimaryOf(context))),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(subtitle!,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textMuted)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryOf(context))),
               ],
             ],
           ),
@@ -676,11 +692,14 @@ class _HorizonSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secondaryBg = AppColors.surfaceSecondaryOf(context);
+    final muted = AppColors.textSecondaryOf(context);
+
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppColors.chip,
-        borderRadius: BorderRadius.circular(16),
+        color: secondaryBg,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -689,20 +708,18 @@ class _HorizonSwitch extends StatelessWidget {
             GestureDetector(
               onTap: () => onChanged(h),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+                duration: const Duration(milliseconds: 160),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: h == value ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text('$h hr',
                     style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            h == value ? FontWeight.w600 : FontWeight.w400,
-                        color:
-                            h == value ? Colors.white : AppColors.textMuted)),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: h == value ? Colors.white : muted)),
               ),
             ),
         ],
@@ -738,14 +755,16 @@ class _ChartCard extends StatelessWidget {
       );
     }
 
-    final hasForecast = forecast?.details != null && forecast!.details!.isNotEmpty;
+    final hasForecast =
+        forecast?.details != null && forecast!.details!.isNotEmpty;
 
     // Ambil prediksi sesuai horizon yang dipilih
     List<double> forecastValues = [];
     if (hasForecast) {
       final details = forecast!.details!;
       if (details.length >= horizon) {
-        forecastValues = details.take(horizon).map((e) => e.predictedQty).toList();
+        forecastValues =
+            details.take(horizon).map((e) => e.predictedQty).toList();
       } else {
         forecastValues = details.map((e) => e.predictedQty).toList();
         final lastVal = forecastValues.isNotEmpty ? forecastValues.last : 0.0;
@@ -765,24 +784,31 @@ class _ChartCard extends StatelessWidget {
     String d(int off) => _fmt(now.add(Duration(days: off)));
     final mid = (horizon / 2).round();
     final labels = [
-      _AxisLabel(-6, d(-6), AppColors.textMuted, FontWeight.w400),
-      const _AxisLabel(0, 'Hari ini', AppColors.textDark, FontWeight.w700),
-      _AxisLabel(mid, d(mid), AppColors.primary, FontWeight.w600),
-      _AxisLabel(horizon, d(horizon), AppColors.primary, FontWeight.w600),
+      _AxisLabel(
+          -6, d(-6), AppColors.textSecondaryOf(context), FontWeight.w400),
+      _AxisLabel(
+          0, 'Hari ini', AppColors.textPrimaryOf(context), FontWeight.w700),
+      _AxisLabel(mid, d(mid), AppColors.primaryOf(context), FontWeight.w600),
+      _AxisLabel(
+          horizon, d(horizon), AppColors.primaryOf(context), FontWeight.w600),
     ];
 
     return SoftCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _LegendDot(color: AppColors.textMuted, text: 'Aktual (Penjualan)'),
+              _LegendDot(
+                  color: AppColors.textSecondaryOf(context),
+                  text: 'Aktual (Penjualan)'),
               _LegendDot(
                   color: hasForecast ? AppColors.primary : AppColors.hint,
-                  text: hasForecast ? 'Prediksi Permintaan' : 'Prediksi Belum Ada',
+                  text: hasForecast
+                      ? 'Prediksi Permintaan'
+                      : 'Prediksi Belum Ada',
                   bold: hasForecast),
             ],
           ),
@@ -822,7 +848,8 @@ class _ChartCard extends StatelessWidget {
                       children: [
                         const TextSpan(text: 'Rata-rata permintaan '),
                         TextSpan(
-                          text: '${avg.toStringAsFixed(1)} ${product.unit}/hari',
+                          text:
+                              '${avg.toStringAsFixed(1)} ${product.unit}/hari',
                           style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               color: AppColors.textDark),
@@ -835,12 +862,14 @@ class _ChartCard extends StatelessWidget {
                   )
                 : const Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: AppColors.textMuted),
+                      Icon(Icons.info_outline,
+                          size: 16, color: AppColors.textMuted),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Prediksi detail belum tersedia di database. Jalankan pipeline ML untuk memperbarui.',
-                          style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                          style: TextStyle(
+                              fontSize: 12.5, color: AppColors.textMuted),
                         ),
                       ),
                     ],
@@ -856,7 +885,8 @@ class _LegendDot extends StatelessWidget {
   final Color color;
   final String text;
   final bool bold;
-  const _LegendDot({required this.color, required this.text, this.bold = false});
+  const _LegendDot(
+      {required this.color, required this.text, this.bold = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1023,8 +1053,8 @@ class _ChartPainter extends CustomPainter {
         ..close();
 
       canvas.save();
-      canvas.clipRect(Rect.fromLTRB(
-          tx - 1, 0, tx + (size.width - side - tx) * progress + 1, size.height));
+      canvas.clipRect(Rect.fromLTRB(tx - 1, 0,
+          tx + (size.width - side - tx) * progress + 1, size.height));
 
       final fillColor = isDashedForecast
           ? Colors.grey.withAlpha(20)
@@ -1058,8 +1088,7 @@ class _ChartPainter extends CustomPainter {
             pts[i],
             3.5,
             Paint()
-              ..color =
-                  isDashedForecast ? AppColors.hint : AppColors.primary);
+              ..color = isDashedForecast ? AppColors.hint : AppColors.primary);
       }
       canvas.restore();
 
@@ -1069,8 +1098,7 @@ class _ChartPainter extends CustomPainter {
             pts.last,
             4.5,
             Paint()
-              ..color =
-                  isDashedForecast ? AppColors.hint : AppColors.primary);
+              ..color = isDashedForecast ? AppColors.hint : AppColors.primary);
       }
       canvas.drawCircle(pts.first, 6.5, Paint()..color = Colors.white);
       canvas.drawCircle(pts.first, 4.5, Paint()..color = AppColors.textDark);
@@ -1203,8 +1231,7 @@ class _RecommendationCard extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) =>
-                      ProductDetailScreens(sku: product.stockCode),
+                  builder: (_) => ProductDetailScreens(sku: product.stockCode),
                 ),
               ),
               icon: const Icon(Icons.arrow_forward_rounded, size: 22),
@@ -1309,12 +1336,9 @@ class _ModelCard extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
-                        color: AppColors.textMuted),
+                        fontSize: 13, height: 1.4, color: AppColors.textMuted),
                     children: [
-                      const TextSpan(
-                          text: 'Model prediksi deret waktu: '),
+                      const TextSpan(text: 'Model prediksi deret waktu: '),
                       TextSpan(
                         text: algorithmName,
                         style: const TextStyle(

@@ -139,7 +139,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         title: const Text('Keluar dari akun?',
             style: TextStyle(fontWeight: FontWeight.w700)),
         content: const Text(
@@ -165,7 +165,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -174,7 +174,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 children: [
                   _ProfileCard(
                     name: _name,
@@ -182,7 +182,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
                     role: _role,
                     onEdit: _editProfile,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   _SectionHeader(
                       title: 'Informasi Toko',
                       action: 'Ubah',
@@ -210,7 +210,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   const _SectionHeader(title: 'Preferensi Notifikasi'),
                   const SizedBox(height: 12),
                   SoftCard(
@@ -256,7 +256,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   const _SectionHeader(title: 'Keamanan Akun'),
                   const SizedBox(height: 12),
                   SoftCard(
@@ -269,7 +269,7 @@ class _ProfileScreensState extends State<ProfileScreens> {
                       onTap: _changePassword,
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   const _SectionHeader(title: 'Lainnya'),
                   const SizedBox(height: 12),
                   SoftCard(
@@ -293,11 +293,11 @@ class _ProfileScreensState extends State<ProfileScreens> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   SoftCard(
                     onTap: _logout,
-                    radius: 20,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    radius: 6,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -305,17 +305,18 @@ class _ProfileScreensState extends State<ProfileScreens> {
                         SizedBox(width: 10),
                         Text('Keluar Akun',
                             style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: _kRed)),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Center(
+                  Center(
                     child: Text('UMKM Sight  ·  Versi 1.0.0',
                         style: TextStyle(
-                            fontSize: 13, color: AppColors.textMuted)),
+                            fontSize: 13,
+                            color: AppColors.textSecondaryOf(context))),
                   ),
                 ],
               ),
@@ -333,31 +334,30 @@ class _ProfileBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 10, 20, 10),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 10, offset: Offset(0, 2)),
-        ],
+      decoration: BoxDecoration(
+        color: AppColors.surfaceOf(context),
+        border: Border(
+          bottom: BorderSide(color: AppColors.borderOf(context), width: 1),
+        ),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.maybePop(context),
-            icon: const Icon(Icons.arrow_back_rounded,
-                color: AppColors.textDark, size: 26),
+            icon: Icon(Icons.arrow_back_rounded, color: textPrimary, size: 22),
           ),
           const SizedBox(width: 4),
-          const Expanded(
+          Expanded(
             child: Text('Profil & Pengaturan',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark)),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: textPrimary)),
           ),
         ],
       ),
@@ -378,31 +378,32 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final primary = AppColors.primaryOf(context);
+    final secondaryBg = AppColors.surfaceSecondaryOf(context);
+
     return SoftCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                width: 68,
-                height: 68,
+                width: 52,
+                height: 52,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFE0E7FF), Color(0xFFC7D2FE)],
-                  ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTintOf(context),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(_initials(name),
-                    style: const TextStyle(
-                        fontSize: 24,
+                    style: TextStyle(
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary)),
+                        color: primary)),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,57 +414,56 @@ class _ProfileCard extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         Text(name,
-                            style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textDark)),
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary)),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 3),
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _kBadgeBg,
-                            borderRadius: BorderRadius.circular(20),
+                            color: AppColors.primaryTintOf(context),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(role,
-                              style: const TextStyle(
-                                  fontSize: 12,
+                              style: TextStyle(
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.primary)),
+                                  color: primary)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(email,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 14, color: AppColors.textMuted)),
+                        style: TextStyle(fontSize: 13, color: textMuted)),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
               Material(
-                color: AppColors.chip,
-                borderRadius: BorderRadius.circular(14),
+                color: secondaryBg,
+                borderRadius: BorderRadius.circular(6),
                 child: InkWell(
                   onTap: onEdit,
-                  borderRadius: BorderRadius.circular(14),
-                  child: const SizedBox(
-                    width: 46,
-                    height: 46,
-                    child: Icon(Icons.edit_outlined,
-                        size: 22, color: AppColors.textMuted),
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child:
+                        Icon(Icons.edit_outlined, size: 18, color: textMuted),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: _kBox,
-              borderRadius: BorderRadius.circular(16),
+              color: secondaryBg,
+              borderRadius: BorderRadius.circular(6),
             ),
             child: const Row(
               children: [
@@ -576,7 +576,7 @@ class _IconBox extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         color: AppColors.chip,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Icon(icon, size: 22, color: AppColors.primary),
     );
@@ -638,7 +638,7 @@ class _NavTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(6),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
@@ -736,7 +736,7 @@ class _ThresholdPicker extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: _kBox,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,7 +756,7 @@ class _ThresholdPicker extends StatelessWidget {
                       decoration: BoxDecoration(
                         color:
                             d == value ? AppColors.primary : AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text('$d hari',
                           style: TextStyle(
@@ -917,11 +917,11 @@ class _FormSheetState extends State<_FormSheet> {
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(6),
                       borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(6),
                       borderSide: const BorderSide(
                           color: AppColors.primary, width: 1.5),
                     ),
@@ -955,7 +955,7 @@ class _FormSheetState extends State<_FormSheet> {
                   textStyle: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w600),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18)),
+                      borderRadius: BorderRadius.circular(6)),
                 ),
                 child: const Text('Simpan'),
               ),

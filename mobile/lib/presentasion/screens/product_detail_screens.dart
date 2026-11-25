@@ -22,15 +22,41 @@ const _kDivider = Color(0x12000000);
 
 // ---------- Helper tanggal ----------
 const _monthsShort = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 const _monthsLong = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
 ];
 const _weekdays = [
-  'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+  'Senin',
+  'Selasa',
+  'Rabu',
+  'Kamis',
+  'Jumat',
+  'Sabtu',
+  'Minggu',
 ];
 
 DateTime _dayOffset(int off) {
@@ -47,8 +73,8 @@ enum DetailStatus { habis, restock, pantau, aman }
 class StockMove {
   final bool isSale;
   final int qty, daysAgo, hour, minute, stockAfter;
-  const StockMove(
-      this.isSale, this.qty, this.daysAgo, this.hour, this.minute, this.stockAfter);
+  const StockMove(this.isSale, this.qty, this.daysAgo, this.hour, this.minute,
+      this.stockAfter);
 
   DateTime get dateTime {
     final n = DateTime.now();
@@ -91,7 +117,7 @@ class ProductDetail {
   }
 
   /// Cari produk berdasarkan SKU (dipakai halaman Produk dan Analitik).
-      static final Map<String, ProductDetail> _edited = {};
+  static final Map<String, ProductDetail> _edited = {};
 
   static ProductDetail bySku(String sku) =>
       _edited[sku] ??
@@ -256,7 +282,7 @@ class _ProductDetailScreensState extends State<ProductDetailScreens> {
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (_) => SafeArea(
         child: Padding(
@@ -310,7 +336,7 @@ class _ProductDetailScreensState extends State<ProductDetailScreens> {
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (_) => _EditSheet(d: d),
     );
@@ -336,14 +362,14 @@ class _ProductDetailScreensState extends State<ProductDetailScreens> {
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 children: [
                   _MonitorRow(onEdit: () => _edit(d)),
                   const SizedBox(height: 16),
                   _ProductPicker(onTap: _pickProduct),
                   const SizedBox(height: 16),
                   _SummaryCard(d: d),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   const _SectionTitle('Prediksi Stok Habis'),
                   const SizedBox(height: 12),
                   if (d.daysLeft == null)
@@ -353,11 +379,11 @@ class _ProductDetailScreensState extends State<ProductDetailScreens> {
                     const SizedBox(height: 14),
                     _ChartCard(d: d),
                   ],
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   const _SectionTitle('Rekomendasi Restock'),
                   const SizedBox(height: 12),
                   _RecommendationCard(d: d),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   _SectionTitle(
                     'Pergerakan Stok Terakhir',
                     trailing: '${d.moves.length} Transaksi Terakhir',
@@ -383,8 +409,8 @@ class _ProductPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return SoftCard(
       onTap: onTap,
-      radius: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      radius: 6,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: const Row(
         children: [
           Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
@@ -392,7 +418,7 @@ class _ProductPicker extends StatelessWidget {
           Expanded(
             child: Text('Lihat produk lain',
                 style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textDark)),
           ),
@@ -416,7 +442,8 @@ class _EditSheetState extends State<_EditSheet> {
   late final _name = TextEditingController(text: widget.d.name);
   late final _category = TextEditingController(text: widget.d.category);
   late final _threshold = TextEditingController(text: '${widget.d.threshold}');
-  late final _restockQty = TextEditingController(text: '${widget.d.restockQty}');
+  late final _restockQty =
+      TextEditingController(text: '${widget.d.restockQty}');
   late final _leadDays = TextEditingController(text: '${widget.d.leadDays}');
   String? _error;
 
@@ -487,11 +514,11 @@ class _EditSheetState extends State<_EditSheet> {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(6),
                 borderSide:
                     const BorderSide(color: AppColors.primary, width: 1.5),
               ),
@@ -510,7 +537,7 @@ class _EditSheetState extends State<_EditSheet> {
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,8 +575,8 @@ class _EditSheetState extends State<_EditSheet> {
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: _kRedBg,
                     borderRadius: BorderRadius.circular(12),
@@ -566,11 +593,11 @@ class _EditSheetState extends State<_EditSheet> {
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  minimumSize: const Size.fromHeight(54),
+                  minimumSize: const Size.fromHeight(44),
                   textStyle: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600),
+                      fontSize: 14, fontWeight: FontWeight.w600),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18)),
+                      borderRadius: BorderRadius.circular(6)),
                 ),
                 child: const Text('Simpan'),
               ),
@@ -610,17 +637,17 @@ class _DetailBar extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textDark)),
           ),
-                    GestureDetector(
+          GestureDetector(
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfileScreens()),
             ),
             child: const CircleAvatar(
-              radius: 24,
+              radius: 16,
               backgroundColor: AppColors.primary,
               child: Icon(Icons.person_outline_rounded, color: Colors.white),
             ),
@@ -658,10 +685,10 @@ class _MonitorRow extends StatelessWidget {
         ),
         Material(
           color: AppColors.chip,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(6),
           child: InkWell(
             onTap: onEdit,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(6),
             child: const SizedBox(
               width: 46,
               height: 46,
@@ -717,7 +744,7 @@ class _SummaryCard extends StatelessWidget {
     final barColor = d.status == DetailStatus.aman ? _kGreen : s.fg;
 
     return SoftCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -727,7 +754,7 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: Text(d.name,
                     style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 18,
                         height: 1.2,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark)),
@@ -738,7 +765,7 @@ class _SummaryCard extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
                   color: s.bg,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(s.label,
                     style: TextStyle(
@@ -752,7 +779,7 @@ class _SummaryCard extends StatelessWidget {
           Text('SKU: ${d.sku}  •  Kategori: ${d.category}',
               style: const TextStyle(
                   fontSize: 14, height: 1.3, color: AppColors.textMuted)),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           const Text('Sisa Stok Saat Ini',
               style: TextStyle(fontSize: 14, color: AppColors.textMuted)),
           const SizedBox(height: 2),
@@ -811,7 +838,7 @@ class _ForecastInfo extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _kBox,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -821,7 +848,7 @@ class _ForecastInfo extends StatelessWidget {
             height: 46,
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: const Icon(Icons.hourglass_bottom_rounded,
                 color: _kBrown, size: 24),
@@ -863,7 +890,7 @@ class _NoForecast extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _kBox,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -907,7 +934,8 @@ class _ChartCard extends StatelessWidget {
             spacing: 18,
             runSpacing: 6,
             children: [
-              _Legend(color: AppColors.textMuted, text: 'Aktual ($actualRange)'),
+              _Legend(
+                  color: AppColors.textMuted, text: 'Aktual ($actualRange)'),
               _Legend(
                   color: AppColors.primary,
                   text: 'Prediksi ($forecastRange)',
@@ -930,7 +958,8 @@ class _ChartCard extends StatelessWidget {
                   rate: d.rate,
                   daysLeft: days,
                   horizon: horizon,
-                  depletionLabel: days == 0 ? 'Hari ini' : _short(_dayOffset(days)),
+                  depletionLabel:
+                      days == 0 ? 'Hari ini' : _short(_dayOffset(days)),
                   progress: progress,
                 ),
               ),
@@ -1042,10 +1071,12 @@ class _StockChartPainter extends CustomPainter {
       dash: 3,
       gap: 4,
     );
-    final habis = _tp('Habis (0)',
-        const TextStyle(fontSize: 12, color: AppColors.textMuted));
-    habis.paint(canvas,
-        Offset(size.width - sideR - habis.width, chartBottom - habis.height - 5));
+    final habis = _tp(
+        'Habis (0)', const TextStyle(fontSize: 12, color: AppColors.textMuted));
+    habis.paint(
+        canvas,
+        Offset(
+            size.width - sideR - habis.width, chartBottom - habis.height - 5));
 
     // Data aktual
     final actualPts = [
@@ -1096,8 +1127,8 @@ class _StockChartPainter extends CustomPainter {
       dash: 4,
       gap: 4,
     );
-    final hariIni = _tp('Hari Ini',
-        const TextStyle(fontSize: 12, color: AppColors.textMuted));
+    final hariIni = _tp(
+        'Hari Ini', const TextStyle(fontSize: 12, color: AppColors.textMuted));
     hariIni.paint(canvas, Offset(tx + 6, 0));
 
     // Prediksi (dianimasikan dari kiri ke kanan)
@@ -1172,7 +1203,8 @@ class _RecommendationCard extends StatelessWidget {
   const _RecommendationCard({required this.d});
 
   InlineSpan _message() {
-    const base = TextStyle(fontSize: 17, height: 1.4, color: AppColors.textDark);
+    const base =
+        TextStyle(fontSize: 17, height: 1.4, color: AppColors.textDark);
     final days = d.daysLeft;
 
     if (days == null) {
@@ -1256,11 +1288,11 @@ class _RecommendationCard extends StatelessWidget {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                minimumSize: const Size.fromHeight(56),
+                minimumSize: const Size.fromHeight(44),
                 textStyle:
-                    const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18)),
+                    borderRadius: BorderRadius.circular(6)),
               ),
             ),
           ),
@@ -1314,10 +1346,12 @@ class _MoveRow extends StatelessWidget {
             height: 46,
             decoration: BoxDecoration(
               color: isSale ? AppColors.chip : _kInBg,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
-              isSale ? Icons.shopping_bag_outlined : Icons.move_to_inbox_outlined,
+              isSale
+                  ? Icons.shopping_bag_outlined
+                  : Icons.move_to_inbox_outlined,
               color: isSale ? AppColors.textDark : _kInFg,
               size: 22,
             ),
@@ -1343,8 +1377,7 @@ class _MoveRow extends StatelessWidget {
                         color: isSale ? _kRedBg : _kInBg,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                          '${isSale ? '-' : '+'}${move.qty} $unitShort',
+                      child: Text('${isSale ? '-' : '+'}${move.qty} $unitShort',
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

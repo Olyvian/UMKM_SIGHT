@@ -94,7 +94,7 @@ class _HomeScreensState extends State<HomeScreens> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -123,14 +123,14 @@ class _HomeScreensState extends State<HomeScreens> {
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: BouncingScrollPhysics(),
                       ),
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                       children: [
                         const _Greeting(),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 12),
                         _StatRow(summary: data.summary),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 12),
                         _ActionButtons(onDataChanged: _reload),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 16),
                         _SectionHeader(
                           title: 'Perlu Perhatian',
                           subtitle:
@@ -138,7 +138,7 @@ class _HomeScreensState extends State<HomeScreens> {
                           action: 'Lihat Semua',
                           onAction: _openProducts,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         if (data.attention.isEmpty)
                           const _EmptyHint(
                             icon: Icons.check_circle_outline,
@@ -147,15 +147,15 @@ class _HomeScreensState extends State<HomeScreens> {
                         else
                           for (final product in data.attention)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: _ProductCard(product: product),
                             ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         const _SectionHeader(
                           title: 'Aktivitas Terbaru',
                           action: 'Terakhir disinkronkan',
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         if (data.activities.isEmpty)
                           const _EmptyHint(
                             icon: Icons.history,
@@ -164,7 +164,7 @@ class _HomeScreensState extends State<HomeScreens> {
                         else
                           for (final activity in data.activities)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: _ActivityCard(activity: activity),
                             ),
                       ],
@@ -181,7 +181,7 @@ class _HomeScreensState extends State<HomeScreens> {
   }
 }
 
-// ---------- Kartu dasar (bayangan lembut + efek tap) ----------
+// ---------- Kartu dasar (adaptif Light & Dark Mode) ----------
 class _SoftCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -189,34 +189,17 @@ class _SoftCard extends StatelessWidget {
 
   const _SoftCard({
     required this.child,
-    this.padding = const EdgeInsets.all(14),
+    this.padding = const EdgeInsets.all(12),
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final r = BorderRadius.circular(24);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: r,
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 14,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: r,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(padding: padding, child: child),
-        ),
-      ),
+    return SoftCard(
+      padding: padding,
+      radius: 6,
+      onTap: onTap,
+      child: child,
     );
   }
 }
@@ -241,19 +224,19 @@ class _Greeting extends StatelessWidget {
                 'Halo, $greeting',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimaryOf(context),
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Pantauan stok dan prediksi pergerakan hari ini',
+              const SizedBox(height: 3),
+              Text(
+                'Pantauan stok & prediksi hari ini',
                 style: TextStyle(
                   fontSize: 14,
-                  height: 1.3,
-                  color: AppColors.textMuted,
+                  height: 1.4,
+                  color: AppColors.textSecondaryOf(context),
                 ),
               ),
             ],
@@ -261,23 +244,21 @@ class _Greeting extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Material(
-          color: AppColors.chip,
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.surfaceSecondaryOf(context),
+          borderRadius: BorderRadius.circular(6),
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(6),
             onTap: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const AnalyticsScreens()),
             ),
-            child: const SizedBox(
-              width: 52,
-              height: 52,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(Icons.bar_chart_rounded,
-                      color: AppColors.primary, size: 28)
-                ],
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Icon(
+                Icons.bar_chart_rounded,
+                color: AppColors.primaryOf(context),
+                size: 20,
               ),
             ),
           ),
@@ -301,23 +282,23 @@ class _StatRow extends StatelessWidget {
           child: _StatCard(
             value: '${summary.activeItems}',
             label: 'Item aktif',
-            color: AppColors.textDark,
+            color: AppColors.textPrimaryOf(context),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
             value: '${summary.needRestock}',
             label: 'Perlu restock',
-            color: _kRestock,
+            color: AppColors.warningOf(context),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
             value: '${summary.outOfStock}',
             label: 'Stok habis',
-            color: _kRedText,
+            color: AppColors.dangerOf(context),
           ),
         ),
       ],
@@ -337,14 +318,15 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SoftCard(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             value,
             style: TextStyle(
-              fontSize: 38,
-              height: 1.1,
+              fontSize: 20,
+              height: 1.2,
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -354,7 +336,10 @@ class _StatCard extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondaryOf(context),
+              ),
             ),
           ),
         ],
@@ -527,45 +512,48 @@ class _ActionButtonsState extends State<_ActionButtons> {
   @override
   Widget build(BuildContext context) {
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(6),
     );
-    const textStyle = TextStyle(fontSize: 17, fontWeight: FontWeight.w600);
+    const textStyle = TextStyle(fontSize: 14, fontWeight: FontWeight.w500);
+    final secondaryBg = AppColors.surfaceSecondaryOf(context);
+    final textColor = AppColors.textPrimaryOf(context);
+    final hintColor = AppColors.textHintOf(context);
 
     return Row(
       children: [
         Expanded(
-          child: FilledButton.icon(
+          child: FilledButton(
             onPressed: _busy ? null : _recordSale,
-            icon: const Icon(Icons.edit_note_rounded, size: 24),
-            label: const FittedBox(child: Text('Catat Penjualan')),
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.chip,
-              foregroundColor: AppColors.textDark,
-              disabledBackgroundColor: AppColors.chip,
-              disabledForegroundColor: AppColors.hint,
-              minimumSize: const Size.fromHeight(60),
+              backgroundColor: secondaryBg,
+              foregroundColor: textColor,
+              disabledBackgroundColor: secondaryBg,
+              disabledForegroundColor: hintColor,
+              minimumSize: const Size.fromHeight(40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               textStyle: textStyle,
               shape: shape,
               elevation: 0,
             ),
+            child: const FittedBox(child: Text('Catat Penjualan')),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 8),
         Expanded(
-          child: FilledButton.icon(
+          child: FilledButton(
             onPressed: _busy ? null : _recordStockIn,
-            icon: const Icon(Icons.add_box_outlined, size: 24),
-            label: const FittedBox(child: Text('+ Stok Masuk')),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.chip,
-              disabledForegroundColor: AppColors.hint,
-              minimumSize: const Size.fromHeight(60),
+              disabledBackgroundColor: secondaryBg,
+              disabledForegroundColor: hintColor,
+              minimumSize: const Size.fromHeight(40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               textStyle: textStyle,
               shape: shape,
               elevation: 0,
             ),
+            child: const FittedBox(child: Text('+ Stok Masuk')),
           ),
         ),
       ],
@@ -589,6 +577,10 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final primary = AppColors.primaryOf(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -598,19 +590,19 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: textPrimary,
                 ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   subtitle!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textMuted,
                   ),
                 ),
               ],
@@ -621,15 +613,15 @@ class _SectionHeader extends StatelessWidget {
         if (onAction != null)
           InkWell(
             onTap: onAction,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
               child: Text(
                 action,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: primary,
                 ),
               ),
             ),
@@ -637,131 +629,74 @@ class _SectionHeader extends StatelessWidget {
         else
           Text(
             action,
-            style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
+            style: TextStyle(fontSize: 12, color: textMuted),
           ),
       ],
     );
   }
 }
 
-// ---------- Kartu produk ----------
+// ---------- Kartu produk (Figma: Name + Pill, Meta, Progress Track) ----------
 class _ProductCard extends StatelessWidget {
   final ProductOverview product;
   const _ProductCard({required this.product});
 
   @override
   Widget build(BuildContext context) {
-    final style = _statusStyle(product.status);
-    final stockColor = product.currentStock == 0
-        ? _kRedText
-        : (product.status == ProductStockStatus.restock ? _kRestock : null);
+    final style = _statusStyle(context, product.status);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final trackBg = AppColors.surfaceSecondaryOf(context);
+
+    // Hitung rasio bar stok terhadap ambang batas (maks 1.0)
+    final threshold = product.reorderThreshold > 0 ? product.reorderThreshold : 10;
+    final ratio = (product.currentStock / (threshold * 2)).clamp(0.06, 1.0);
 
     return _SoftCard(
+      padding: const EdgeInsets.all(12),
       onTap: () => Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ProductScreens()),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 56,
-                height: 56,
-                color: AppColors.chip,
-                child: const Icon(
-                  Icons.shopping_bag_outlined,
-                  color: AppColors.hint,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: textPrimary,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
+              _Pill(text: style.label, bg: style.bg, fg: style.fg),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Stok ${product.currentStock} ${product.unit}  •  ${_etaText(product)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: textMuted,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _Pill(text: style.label, bg: style.bg, fg: style.fg),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _kInfoBar,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: AppColors.textMuted,
-                          ),
-                          children: [
-                            const TextSpan(text: 'Sisa: '),
-                            TextSpan(
-                              text:
-                                  '${product.currentStock} ${product.unit}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: stockColor ?? AppColors.textDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _etaIcon(product),
-                              size: 18,
-                              color: AppColors.textMuted,
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                _etaText(product),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: product.currentStock <= 0 ? 0.04 : ratio,
+              minHeight: 4,
+              backgroundColor: trackBg,
+              valueColor: AlwaysStoppedAnimation<Color>(style.fg),
             ),
           ),
         ],
@@ -778,21 +713,28 @@ class _ActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOutOfStock = activity.stockAfter == 0;
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textMuted = AppColors.textSecondaryOf(context);
+    final chipBg = AppColors.surfaceSecondaryOf(context);
 
     return _SoftCard(
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppColors.chip,
-              borderRadius: BorderRadius.circular(16),
+              color: chipBg,
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(_activityIcon(activity.movementType),
-                color: AppColors.textDark),
+            child: Icon(
+              _activityIcon(activity.movementType),
+              color: textPrimary,
+              size: 18,
+            ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -802,18 +744,18 @@ class _ActivityCard extends StatelessWidget {
                   '${activity.productName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textDark,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _formatActivityTime(activity.createdAt),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textMuted,
                   ),
                 ),
               ],
@@ -821,10 +763,9 @@ class _ActivityCard extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _Pill(
-            text: 'Sisa: ${activity.stockAfter} ${activity.unit}',
-            bg: isOutOfStock ? _kRedBg : AppColors.chip,
-            fg: isOutOfStock ? _kRedText : AppColors.textDark,
-            bold: true,
+            text: 'Sisa: ${activity.stockAfter}',
+            bg: isOutOfStock ? AppColors.dangerBgOf(context) : chipBg,
+            fg: isOutOfStock ? AppColors.dangerOf(context) : textPrimary,
           ),
         ],
       ),
@@ -832,31 +773,30 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-// ---------- Label kecil (badge) ----------
+// ---------- Label kecil (badge Figma radius 6px) ----------
 class _Pill extends StatelessWidget {
   final String text;
   final Color bg, fg;
-  final bool bold;
   const _Pill({
     required this.text,
     required this.bg,
     required this.fg,
-    this.bold = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 14,
-          fontWeight: bold ? FontWeight.w600 : FontWeight.w500,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.2,
           color: fg,
         ),
       ),
@@ -877,12 +817,15 @@ class _EmptyHint extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
-          Icon(icon, size: 40, color: AppColors.hint),
-          const SizedBox(height: 10),
+          Icon(icon, size: 36, color: AppColors.textHintOf(context)),
+          const SizedBox(height: 8),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16, color: AppColors.textMuted),
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondaryOf(context),
+            ),
           ),
         ],
       ),
@@ -904,17 +847,24 @@ class _LoadError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, color: _kRedText, size: 40),
+            Icon(
+              Icons.cloud_off_outlined,
+              color: AppColors.dangerOf(context),
+              size: 40,
+            ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Beranda belum dapat dimuat',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimaryOf(context),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.textSecondaryOf(context)),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -938,16 +888,32 @@ class _StatusStyle {
   final Color fg;
 }
 
-_StatusStyle _statusStyle(ProductStockStatus status) {
+_StatusStyle _statusStyle(BuildContext context, ProductStockStatus status) {
   switch (status) {
     case ProductStockStatus.outOfStock:
-      return const _StatusStyle('Stok habis', _kRedBg, _kRedText);
+      return _StatusStyle(
+        'Stok habis',
+        AppColors.dangerBgOf(context),
+        AppColors.dangerOf(context),
+      );
     case ProductStockStatus.restock:
-      return const _StatusStyle('Segera restock', _kOrangeBg, _kRestock);
+      return _StatusStyle(
+        'Segera restock',
+        AppColors.warningBgOf(context),
+        AppColors.warningOf(context),
+      );
     case ProductStockStatus.monitor:
-      return const _StatusStyle('Perlu dipantau', AppColors.chip, _kGreyText);
+      return _StatusStyle(
+        'Perlu dipantau',
+        AppColors.surfaceSecondaryOf(context),
+        AppColors.textSecondaryOf(context),
+      );
     case ProductStockStatus.safe:
-      return const _StatusStyle('Stok aman', AppColors.chip, _kGreyText);
+      return _StatusStyle(
+        'Stok aman',
+        AppColors.successBgOf(context),
+        AppColors.successOf(context),
+      );
   }
 }
 
