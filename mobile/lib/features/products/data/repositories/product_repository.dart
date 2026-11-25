@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/product_overview.dart';
+import '../models/stock_movement_item.dart';
 
 class ProductFailure implements Exception {
   const ProductFailure(this.message);
@@ -291,6 +292,28 @@ class ProductRepository {
       );
     } on PostgrestException catch (error) {
       throw _failure(error, 'Gagal mengoreksi stok.');
+    }
+  }
+
+  /// Mengambil riwayat mutasi stok (keluar/masuk) milik toko yang sedang login.
+  /// Data otomatis tersaring oleh Row Level Security (RLS) di Supabase.
+  Future<List<StockMovementItem>> fetchStockMovements({int limit = 200}) async {
+    try {
+      final rows = await _client
+          .from('stock_movements')
+          .select(
+            'id, movement_type, quantity, stock_before, stock_after, note, '
+            'created_at, products(name, unit), transactions(invoice_no)',
+          )
+          .inFilter('movement_type', const ['IN', 'OUT'])
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return rows.map(StockMovementItem.fromJson).toList();
+    } on PostgrestException catch (error) {
+      throw _failure(error, 'Gagal memuat riwayat transaksi.');
+    } on FormatException catch (error) {
+      throw ProductFailure('Data riwayat transaksi tidak sesuai: ${error.message}');
     }
   }
 

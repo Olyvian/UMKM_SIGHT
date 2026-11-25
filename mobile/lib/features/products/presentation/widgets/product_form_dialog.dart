@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -54,6 +52,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController _thresholdController;
   late bool _isMonitored;
   XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
 
   @override
   void initState() {
@@ -104,8 +103,13 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         maxWidth: 1600,
         maxHeight: 1600,
       );
-      if (image != null && mounted) {
-        setState(() => _selectedImage = image);
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        if (!mounted) return;
+        setState(() {
+          _selectedImage = image;
+          _selectedImageBytes = bytes;
+        });
       }
     } on PlatformException catch (error) {
       if (!mounted) return;
@@ -207,9 +211,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     child: SizedBox(
                       width: 72,
                       height: 72,
-                      child: _selectedImage != null
-                          ? Image.file(
-                              File(_selectedImage!.path),
+                      child: _selectedImageBytes != null
+                          ? Image.memory(
+                              _selectedImageBytes!,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
                                   const _ImagePlaceholder(),

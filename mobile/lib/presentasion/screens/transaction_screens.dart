@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../features/products/data/models/product_overview.dart';
+import '../../features/products/data/models/stock_movement_item.dart';
+import '../../features/products/data/repositories/product_repository.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sale_entry_sheet.dart';
 import '../widgets/stock_in_sheet.dart';
@@ -27,22 +31,31 @@ String _fmtDate(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 String _fmtTime(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} WIB';
 
-String _groupLabel(int daysAgo, DateTime d) {
+DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+int _daysAgoFromToday(DateTime d) {
+  final today = _dateOnly(DateTime.now());
+  return today.difference(_dateOnly(d)).inDays;
+}
+
+String _groupLabel(DateTime day) {
+  final daysAgo = _daysAgoFromToday(day);
   final name = daysAgo == 0
       ? 'Hari ini'
       : daysAgo == 1
           ? 'Kemarin'
-          : _weekdays[d.weekday - 1];
-  return '${name.toUpperCase()}  ·  ${_fmtDate(d).toUpperCase()}';
+          : _weekdays[day.weekday - 1];
+  return '${name.toUpperCase()}  ·  ${_fmtDate(day).toUpperCase()}';
 }
 
-// ---------- Model & data contoh (ganti dengan data API nanti) ----------
 enum TxType { keluar, masuk }
 
 class _Tx {
   final String id, product, unit;
-  final int qty, stockAfter, daysAgo, hour, minute;
+  final int qty, stockBefore, stockAfter;
+  final DateTime dateTime;
   final TxType type;
+  final String? note;
 
   const _Tx({
     required this.id,
@@ -50,50 +63,29 @@ class _Tx {
     required this.unit,
     required this.type,
     required this.qty,
+    required this.stockBefore,
     required this.stockAfter,
-    required this.daysAgo,
-    required this.hour,
-    required this.minute,
+    required this.dateTime,
+    this.note,
   });
 
-  bool get isOut => type == TxType.keluar;
-  int get stockBefore => isOut ? stockAfter + qty : stockAfter - qty;
-
-  DateTime get dateTime {
-    final n = DateTime.now();
-    return DateTime(n.year, n.month, n.day - daysAgo, hour, minute);
+  factory _Tx.fromMovement(StockMovementItem item) {
+    return _Tx(
+      id: item.displayRef,
+      product: item.productName,
+      unit: item.unit,
+      type: item.isOut ? TxType.keluar : TxType.masuk,
+      qty: item.quantity,
+      stockBefore: item.stockBefore,
+      stockAfter: item.stockAfter,
+      dateTime: item.createdAt,
+      note: item.note,
+    );
   }
+
+  bool get isOut => type == TxType.keluar;
+  int get daysAgo => _daysAgoFromToday(dateTime);
 }
-
-const _transactions = <_Tx>[
-  _Tx(id: 'TRX-0012', product: 'Minyak Goreng Sania 2L', unit: 'botol', type: TxType.keluar, qty: 3, stockAfter: 0, daysAgo: 0, hour: 9, minute: 30),
-  _Tx(id: 'TRX-0011', product: 'Beras Premium 5 kg', unit: 'karung', type: TxType.keluar, qty: 2, stockAfter: 4, daysAgo: 0, hour: 8, minute: 15),
-  _Tx(id: 'TRX-0010', product: 'Gula Pasir 1 kg', unit: 'kg', type: TxType.masuk, qty: 20, stockAfter: 29, daysAgo: 1, hour: 14, minute: 15),
-  _Tx(id: 'TRX-0009', product: 'Kecap Manis Botol 600 ml', unit: 'botol', type: TxType.keluar, qty: 6, stockAfter: 24, daysAgo: 1, hour: 11, minute: 0),
-  _Tx(id: 'TRX-0008', product: 'Mi Instan Goreng', unit: 'bungkus', type: TxType.masuk, qty: 40, stockAfter: 38, daysAgo: 3, hour: 10, minute: 20),
-  _Tx(id: 'TRX-0007', product: 'Beras Premium 5 kg', unit: 'karung', type: TxType.masuk, qty: 10, stockAfter: 8, daysAgo: 5, hour: 13, minute: 5),
-  _Tx(id: 'TRX-0006', product: 'Minyak Goreng Sania 2L', unit: 'botol', type: TxType.keluar, qty: 4, stockAfter: 3, daysAgo: 45, hour: 16, minute: 40),
-];
-
-const _stockInProducts = <StockInProduct>[
-  StockInProduct(name: 'Minyak Goreng Sania 2L', unit: 'botol'),
-  StockInProduct(name: 'Beras Premium 5 kg', unit: 'karung'),
-  StockInProduct(name: 'Gula Pasir 1 kg', unit: 'kg'),
-  StockInProduct(name: 'Kecap Manis Botol 600 ml', unit: 'botol'),
-  StockInProduct(name: 'Mi Instan Goreng', unit: 'bungkus'),
-];
-
-const _saleProducts = <SaleEntryProduct>[
-  SaleEntryProduct(
-      name: 'Minyak Goreng Sania 2L', unit: 'botol', availableStock: 0),
-  SaleEntryProduct(
-      name: 'Beras Premium 5 kg', unit: 'karung', availableStock: 4),
-  SaleEntryProduct(name: 'Gula Pasir 1 kg', unit: 'kg', availableStock: 9),
-  SaleEntryProduct(
-      name: 'Kecap Manis Botol 600 ml', unit: 'botol', availableStock: 24),
-  SaleEntryProduct(
-      name: 'Mi Instan Goreng', unit: 'bungkus', availableStock: 38),
-];
 
 // =====================================================================
 class TransactionScreens extends StatefulWidget {
@@ -105,32 +97,177 @@ class TransactionScreens extends StatefulWidget {
 
 class _TransactionScreensState extends State<TransactionScreens> {
   final _searchCtrl = TextEditingController();
+  late final ProductRepository _repository;
+  late Future<List<_Tx>> _txFuture;
+  List<_Tx>? _lastData;
+
   TxType? _type; // null = semua
   bool _last30 = false;
+  bool _busy = false;
 
-  void _soon(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  @override
+  void initState() {
+    super.initState();
+    _repository = context.read<ProductRepository>();
+    _txFuture = _load();
+  }
+
+  Future<List<_Tx>> _load() async {
+    final items = await _repository.fetchStockMovements();
+    final mapped = items.map(_Tx.fromMovement).toList();
+    _lastData = mapped;
+    return mapped;
+  }
+
+  void _reload() {
+    setState(() {
+      _txFuture = _load();
+    });
+  }
+
+  Future<void> _refresh() async {
+    final future = _load();
+    setState(() => _txFuture = future);
+    try {
+      await future;
+    } catch (_) {
+      // Galat ditampilkan oleh FutureBuilder.
+    }
+  }
+
+  void _showMessage(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: isError ? _kOutFg : null,
+        ),
+      );
+  }
+
+  String _errorText(Object error, String fallback) {
+    if (error is ProductFailure) return error.message;
+    return '$fallback $error';
+  }
+
+  Future<List<ProductOverview>> _loadActiveProducts() async {
+    final products = await _repository.fetchProducts();
+    return products.where((p) => p.isActive).toList();
   }
 
   Future<void> _openSaleEntry() async {
-    final result = await showSaleEntrySheet(context, products: _saleProducts);
-    if (result == null || !mounted) return;
-    _soon(
-      '${result.quantity} ${result.product.unit} ${result.product.name} '
-      'valid, tetapi belum disimpan ke riwayat.',
-    );
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final products = (await _loadActiveProducts())
+          .where((p) => p.currentStock > 0)
+          .toList();
+      if (!mounted) return;
+      if (products.isEmpty) {
+        _showMessage(
+          'Belum ada produk aktif yang stoknya tersedia.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await showSaleEntrySheet(
+        context,
+        products: [
+          for (final p in products)
+            SaleEntryProduct(
+              id: p.id,
+              name: p.name,
+              unit: p.unit,
+              availableStock: p.currentStock,
+            ),
+        ],
+      );
+      if (result == null || !mounted) return;
+
+      final productId = result.product.id;
+      if (productId == null) {
+        _showMessage('Produk tidak dikenali. Muat ulang halaman.', isError: true);
+        return;
+      }
+
+      await _repository.recordSale(
+        productId: productId,
+        quantity: result.quantity,
+        transactionDate: result.dateTime,
+      );
+      if (!mounted) return;
+
+      _showMessage(
+        'Penjualan ${result.quantity} ${result.product.unit} '
+        '${result.product.name} tersimpan.',
+      );
+      _reload();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        _errorText(error, 'Gagal mencatat penjualan:'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _openStockIn() async {
-    final result = await showStockInSheet(
-      context,
-      products: _stockInProducts,
-    );
-    if (result == null || !mounted) return;
-    _soon(
-      'Stok masuk ${result.quantity} ${result.product.unit} '
-      '${result.product.name} valid, tetapi belum disimpan.',
-    );
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final products = await _loadActiveProducts();
+      if (!mounted) return;
+      if (products.isEmpty) {
+        _showMessage(
+          'Belum ada produk aktif. Tambahkan produk lebih dulu.',
+          isError: true,
+        );
+        return;
+      }
+
+      final result = await showStockInSheet(
+        context,
+        products: [
+          for (final p in products)
+            StockInProduct(
+              id: p.id,
+              name: p.name,
+              unit: p.unit,
+            ),
+        ],
+      );
+      if (result == null || !mounted) return;
+
+      final productId = result.product.id;
+      if (productId == null) {
+        _showMessage('Produk tidak dikenali. Muat ulang halaman.', isError: true);
+        return;
+      }
+
+      await _repository.recordStockIn(
+        productId: productId,
+        quantity: result.quantity,
+      );
+      if (!mounted) return;
+
+      _showMessage(
+        'Stok masuk ${result.quantity} ${result.product.unit} '
+        '${result.product.name} tersimpan.',
+      );
+      _reload();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        _errorText(error, 'Gagal mencatat stok masuk:'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -141,25 +278,6 @@ class _TransactionScreensState extends State<TransactionScreens> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _searchCtrl.text.trim().toLowerCase();
-
-    final todayOut = _transactions.where((t) => t.isOut && t.daysAgo == 0).length;
-    final weekIn = _transactions.where((t) => !t.isOut && t.daysAgo < 7).length;
-
-    final list = _transactions
-        .where((t) =>
-            (_type == null || t.type == _type) &&
-            (!_last30 || t.daysAgo <= 30) &&
-            t.product.toLowerCase().contains(query))
-        .toList()
-      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
-
-    // Kelompokkan per hari (urutan sudah menurun)
-    final groups = <int, List<_Tx>>{};
-    for (final t in list) {
-      groups.putIfAbsent(t.daysAgo, () => []).add(t);
-    }
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -168,83 +286,138 @@ class _TransactionScreensState extends State<TransactionScreens> {
           children: [
             const AppTopBar(),
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                children: [
-                  _Header(
-                    onExport: () => _soon('Ekspor riwayat belum tersedia'),
-                  ),
-                  const SizedBox(height: 18),
-                  _ActionRow(
-                    onSale: _openSaleEntry,
-                    onStockIn: _openStockIn,
-                  ),
-                  const SizedBox(height: 16),
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: FutureBuilder<List<_Tx>>(
+                future: _txFuture,
+                initialData: _lastData,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError && !snapshot.hasData) {
+                    return _LoadError(
+                      message: snapshot.error.toString(),
+                      onRetry: _reload,
+                    );
+                  }
+
+                  final allTx = snapshot.data ?? const <_Tx>[];
+                  final query = _searchCtrl.text.trim().toLowerCase();
+
+                  final todayOut = allTx
+                      .where((t) => t.isOut && t.daysAgo == 0)
+                      .length;
+                  final weekIn = allTx
+                      .where((t) => !t.isOut && t.daysAgo >= 0 && t.daysAgo < 7)
+                      .length;
+
+                  final list = allTx
+                      .where((t) =>
+                          (_type == null || t.type == _type) &&
+                          (!_last30 || (t.daysAgo >= 0 && t.daysAgo <= 30)) &&
+                          t.product.toLowerCase().contains(query))
+                      .toList()
+                    ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+
+                  // Kelompokkan per hari kalender (urutan sudah menurun)
+                  final groups = <DateTime, List<_Tx>>{};
+                  for (final t in list) {
+                    final day = _dateOnly(t.dateTime);
+                    groups.putIfAbsent(day, () => []).add(t);
+                  }
+
+                  final hasFilter =
+                      query.isNotEmpty || _type != null || _last30;
+
+                  return RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
                       children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'Barang keluar hari ini',
-                            value: '$todayOut',
-                            unit: 'transaksi',
-                            caption: 'Total barang terjual',
-                            icon: Icons.north_east_rounded,
-                            iconBg: _kOutBg,
-                            iconFg: _kOutFg,
+                        _Header(
+                          onExport: () =>
+                              _showMessage('Ekspor riwayat belum tersedia'),
+                        ),
+                        const SizedBox(height: 18),
+                        _ActionRow(
+                          onSale: _openSaleEntry,
+                          onStockIn: _openStockIn,
+                        ),
+                        const SizedBox(height: 16),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: _SummaryCard(
+                                  label: 'Barang keluar hari ini',
+                                  value: '$todayOut',
+                                  unit: 'transaksi',
+                                  caption: 'Total barang terjual',
+                                  icon: Icons.north_east_rounded,
+                                  iconBg: _kOutBg,
+                                  iconFg: _kOutFg,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: _SummaryCard(
+                                  label: 'Barang masuk minggu ini',
+                                  value: '$weekIn',
+                                  unit: 'pengiriman',
+                                  caption: 'Pasokan inventaris',
+                                  icon: Icons.south_west_rounded,
+                                  iconBg: _kInBg,
+                                  iconFg: _kInFg,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'Barang masuk minggu ini',
-                            value: '$weekIn',
-                            unit: 'pengiriman',
-                            caption: 'Pasokan inventaris',
-                            icon: Icons.south_west_rounded,
-                            iconBg: _kInBg,
-                            iconFg: _kInFg,
-                          ),
+                        const SizedBox(height: 16),
+                        _SearchField(
+                          controller: _searchCtrl,
+                          onChanged: (_) => setState(() {}),
                         ),
+                        const SizedBox(height: 14),
+                        _FilterRow(
+                          type: _type,
+                          last30: _last30,
+                          onType: (t) => setState(() => _type = t),
+                          onLast30: () => setState(() => _last30 = !_last30),
+                        ),
+                        const SizedBox(height: 22),
+                        if (list.isEmpty)
+                          _EmptyState(
+                            message: hasFilter
+                                ? 'Belum ada transaksi yang cocok'
+                                : 'Belum ada riwayat transaksi',
+                          ),
+                        for (final entry in groups.entries) ...[
+                          _GroupHeader(
+                            label: _groupLabel(entry.key),
+                            count: entry.value.length,
+                          ),
+                          const SizedBox(height: 10),
+                          for (final tx in entry.value)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _TxCard(
+                                tx: tx,
+                                onTap: () => _showDetail(context, tx),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                        ],
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _SearchField(
-                    controller: _searchCtrl,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 14),
-                  _FilterRow(
-                    type: _type,
-                    last30: _last30,
-                    onType: (t) => setState(() => _type = t),
-                    onLast30: () => setState(() => _last30 = !_last30),
-                  ),
-                  const SizedBox(height: 22),
-                  if (list.isEmpty) const _EmptyState(),
-                  for (final entry in groups.entries) ...[
-                    _GroupHeader(
-                      label: _groupLabel(
-                          entry.key, entry.value.first.dateTime),
-                      count: entry.value.length,
-                    ),
-                    const SizedBox(height: 10),
-                    for (final tx in entry.value)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _TxCard(
-                          tx: tx,
-                          onTap: () => _showDetail(context, tx),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                  ],
-                ],
+                  );
+                },
               ),
             ),
           ],
@@ -718,21 +891,54 @@ class _TxCard extends StatelessWidget {
   }
 }
 
-// ---------- Kondisi kosong ----------
+// ---------- Kondisi kosong & galat ----------
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final String message;
+  const _EmptyState({required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 40),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
       child: Column(
         children: [
-          Icon(Icons.receipt_long_outlined, size: 44, color: AppColors.hint),
-          SizedBox(height: 10),
-          Text('Belum ada transaksi yang cocok',
-              style: TextStyle(fontSize: 16, color: AppColors.textMuted)),
+          const Icon(Icons.receipt_long_outlined, size: 44, color: AppColors.hint),
+          const SizedBox(height: 10),
+          Text(message,
+              style: const TextStyle(fontSize: 16, color: AppColors.textMuted)),
         ],
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _LoadError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 44, color: _kOutFg),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRetry,
+              child: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
       ),
     );
   }
